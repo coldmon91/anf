@@ -20,6 +20,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
 
     private weak var workspace: WorkspaceModel?
     private var panel: PalettePanel?
+    private var isShown = false
     private weak var anchorWindow: NSWindow?
     private var field: NSTextField!
     private var table: NSTableView!
@@ -27,10 +28,10 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     private var deepResults: [Target] = []
     private var deepTask: Task<Void, Never>?
 
-    private let panelWidth: CGFloat = 620
-    private let rowHeight: CGFloat = 34
-    private let fieldHeight: CGFloat = 50
-    private let maxVisibleRows = 9
+    private let panelWidth: CGFloat = 760
+    private let rowHeight: CGFloat = 36
+    private let fieldHeight: CGFloat = 56
+    private let maxVisibleRows = 12
 
     init(workspace: WorkspaceModel) {
         self.workspace = workspace
@@ -39,17 +40,17 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
 
     // MARK: - Show / hide
 
-    func toggle() {
-        if panel?.isVisible == true { hide() } else { show() }
-    }
+    func toggle() { isShown ? hide() : show() }
 
     func show() {
+        guard !isShown else { return }
         let host = NSApp.keyWindow ?? NSApp.mainWindow
             ?? NSApp.windows.first { $0.isVisible && $0.styleMask.contains(.titled) }
         guard let host else { return }
         anchorWindow = host
         let panel = panel ?? buildPanel()
         self.panel = panel
+        isShown = true
 
         field.stringValue = ""
         deepResults = []
@@ -62,6 +63,8 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     }
 
     func hide() {
+        guard isShown else { return }
+        isShown = false
         deepTask?.cancel()
         if let panel {
             anchorWindow?.removeChildWindow(panel)
@@ -74,10 +77,11 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     private func position(over host: NSWindow) {
         guard let panel else { return }
         let h = panel.frame.height
-        // Center within the anf window.
-        let wf = host.frame
-        let x = wf.midX - panelWidth / 2
-        let y = wf.midY - h / 2
+        // Center on the screen the window is on (slightly above true center, like
+        // Spotlight) so a large result list has room to breathe.
+        let area = (host.screen ?? NSScreen.main)?.visibleFrame ?? host.frame
+        let x = area.midX - panelWidth / 2
+        let y = area.midY - h / 2 + area.height * 0.06
         panel.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
@@ -222,31 +226,36 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
             results = all.filter { seen.insert($0.url.standardizedFileURL.path).inserted }
                          .prefix(40).map { $0 }
         } else {
-            var all: [Target] = []
+            // Local candidates (favorites / recents / current folder) — filter
+            // these by name or path so only relevant ones show.
+            var local: [Target] = []
             for f in SidebarBuilder.favorites() {
-                all.append(.init(name: f.name, url: f.url, symbol: f.symbol, isFile: false))
+                local.append(.init(name: f.name, url: f.url, symbol: f.symbol, isFile: false))
             }
             for u in workspace.favorites.items {
-                all.append(.init(name: u.lastPathComponent.isEmpty ? u.path : u.lastPathComponent,
-                                 url: u, symbol: "star.fill", isFile: false))
+                local.append(.init(name: u.lastPathComponent.isEmpty ? u.path : u.lastPathComponent,
+                                   url: u, symbol: "star.fill", isFile: false))
             }
             for u in RecentFolders.shared.items {
-                all.append(.init(name: u.lastPathComponent.isEmpty ? u.path : u.lastPathComponent,
-                                 url: u, symbol: "clock", isFile: false))
+                local.append(.init(name: u.lastPathComponent.isEmpty ? u.path : u.lastPathComponent,
+                                   url: u, symbol: "clock", isFile: false))
             }
             for item in workspace.active.items {
-                all.append(.init(name: item.name, url: item.url,
-                                 symbol: item.isBrowsableContainer ? "folder" : "doc",
-                                 isFile: !item.isBrowsableContainer))
+                local.append(.init(name: item.name, url: item.url,
+                                   symbol: item.isBrowsableContainer ? "folder" : "doc",
+                                   isFile: !item.isBrowsableContainer))
             }
-            all.append(contentsOf: deepResults)
-
-            var seen = Set<String>()
-            let unique = all.filter { seen.insert($0.url.standardizedFileURL.path).inserted }
-            results = unique.filter {
+            let filteredLocal = local.filter {
                 $0.name.localizedCaseInsensitiveContains(q)
                 || $0.url.path.localizedCaseInsensitiveContains(q)
-            }.prefix(40).map { $0 }
+            }
+            // deepResults are already matched by fd/ripgrep/fzf — do NOT re-filter
+            // them. ripgrep CONTENT matches don't contain the query in their name
+            // or path, so the old name/path filter discarded every content hit.
+            var seen = Set<String>()
+            results = (filteredLocal + deepResults)
+                .filter { seen.insert($0.url.standardizedFileURL.path).inserted }
+                .prefix(80).map { $0 }
         }
         table?.reloadData()
         if !results.isEmpty {
@@ -399,26 +408,96 @@ private final class PaletteRowBackground: NSTableRowView {
     override var isEmphasized: Bool { get { true } set {} }
 }
 
-/// Bounded recursive filename search used by the palette.
+/// Recursive search used by the palette. Uses optional CLI tools when present —
+/// `fd` for fast/deep filename matching, `ripgrep` for file *content* matching,
+/// `fzf` for fuzzy ranking — and falls back to a bounded FileManager walk when
+/// none are installed. anf works either way; the tools just make it faster and
+/// add content search.
 enum PaletteSearch {
     static func scan(root: URL, needle: String, maxDepth: Int = 4,
                      cap: Int = 120) -> [CommandPaletteController.Target] {
+        var results: [CommandPaletteController.Target] = []
+        var seen = Set<String>()
+
+        func add(_ url: URL, content: Bool) {
+            let key = url.standardizedFileURL.path
+            guard seen.insert(key).inserted, results.count < cap else { return }
+            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+            results.append(.init(
+                name: url.lastPathComponent, url: url,
+                symbol: content ? "doc.text.magnifyingglass" : (isDir ? "folder" : "doc"),
+                isFile: !isDir))
+        }
+
+        // 1) Filename matches — fd if available, else a FileManager walk.
+        var names = fdNames(root: root, needle: needle, cap: cap)
+            ?? fmNames(root: root, needle: needle, maxDepth: maxDepth, cap: cap)
+        // Fuzzy-rank with fzf when present (purely reorders the candidate set).
+        names = fzfRank(names, query: needle) ?? names
+        for url in names where results.count < cap { add(url, content: false) }
+
+        // 2) Content matches — ripgrep, appended after filename hits.
+        if results.count < cap, !Task.isCancelled {
+            for url in rgContent(root: root, needle: needle, cap: cap - results.count) {
+                add(url, content: true)
+            }
+        }
+        return results
+    }
+
+    // MARK: - fd (filenames)
+
+    private static func fdNames(root: URL, needle: String, cap: Int) -> [URL]? {
+        guard let fd = ExternalTools.path("fd") else { return nil }
+        let lines = ExternalTools.run(fd, [
+            "--color=never", "--absolute-path", "--no-ignore",
+            "--fixed-strings", "--type", "f", "--type", "d",
+            "--max-results", "\(cap)", needle, root.path
+        ], maxLines: cap)
+        return lines.map { URL(fileURLWithPath: $0) }
+    }
+
+    // MARK: - FileManager fallback
+
+    private static func fmNames(root: URL, needle: String,
+                                maxDepth: Int, cap: Int) -> [URL] {
         let fm = FileManager.default
         guard let en = fm.enumerator(
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return [] }
-        var results: [CommandPaletteController.Target] = []
+        var urls: [URL] = []
         for case let url as URL in en {
             if en.level > maxDepth { en.skipDescendants(); continue }
-            if Task.isCancelled || results.count >= cap { break }
-            let name = url.lastPathComponent
-            guard name.localizedCaseInsensitiveContains(needle) else { continue }
-            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-            results.append(.init(name: name, url: url,
-                                 symbol: isDir ? "folder" : "doc", isFile: !isDir))
+            if Task.isCancelled || urls.count >= cap { break }
+            if url.lastPathComponent.localizedCaseInsensitiveContains(needle) {
+                urls.append(url)
+            }
         }
-        return results
+        return urls
+    }
+
+    // MARK: - fzf (fuzzy ranking)
+
+    private static func fzfRank(_ urls: [URL], query: String) -> [URL]? {
+        guard urls.count > 1, let fzf = ExternalTools.path("fzf") else { return nil }
+        let byPath = Dictionary(urls.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
+        let input = urls.map(\.path).joined(separator: "\n")
+        let ranked = ExternalTools.run(fzf, ["--filter", query],
+                                       stdin: input, maxLines: urls.count)
+            .compactMap { byPath[$0] }
+        return ranked.isEmpty ? nil : ranked
+    }
+
+    // MARK: - ripgrep (content)
+
+    private static func rgContent(root: URL, needle: String, cap: Int) -> [URL] {
+        guard let rg = ExternalTools.path("rg") else { return [] }
+        let lines = ExternalTools.run(rg, [
+            "--color=never", "--files-with-matches", "--smart-case",
+            "--max-count", "1", "--no-messages", "--", needle, root.path
+        ], maxLines: cap)
+        return lines.map { URL(fileURLWithPath: $0) }
     }
 }
