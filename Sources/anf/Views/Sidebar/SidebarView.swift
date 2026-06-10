@@ -60,7 +60,7 @@ struct SidebarView: View {
                         ForEach(workspace.savedViews.views) { viewRow($0) }
                     }
                 } header: {
-                    sectionHeader("View", isOpen: $openViews)
+                    sectionHeader("Workspace", isOpen: $openViews)
                 }
             }
             if !locations.isEmpty {
@@ -101,7 +101,7 @@ struct SidebarView: View {
             locations = await Task.detached(priority: .utility) { SidebarBuilder.locations() }.value
             sshHosts = await Task.detached(priority: .utility) { SSHConfig.hosts() }.value
         }
-        .alert("View 이름 변경", isPresented: Binding(
+        .alert("Workspace 이름 변경", isPresented: Binding(
             get: { renamingView != nil },
             set: { if !$0 { renamingView = nil } })) {
             TextField("이름", text: $renameText)

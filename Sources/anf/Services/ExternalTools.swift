@@ -13,6 +13,9 @@ enum ExternalTools {
             "\(home)/.cargo/bin",     // cargo-installed (fd/rg)
             "\(home)/.local/bin",
             "/opt/local/bin",         // MacPorts
+            "/opt/zerobrew/prefix/bin",   // zerobrew prefix
+            "/run/current-system/sw/bin", // Nix (system)
+            "\(home)/.nix-profile/bin",   // Nix (user profile)
         ]
         // A Finder-launched app gets a minimal PATH, so also read the user's
         // login-shell PATH — this picks up non-standard prefixes (custom brews,

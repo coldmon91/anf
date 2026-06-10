@@ -770,6 +770,14 @@ enum PaletteSearch {
         "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
+    /// NFC + NFD forms of `s`, de-duplicated. Korean from the IME vs. on-disk text
+    /// can differ only by normalization; byte matchers (grep/rg) need both.
+    static func normalizationVariants(_ s: String) -> [String] {
+        let nfc = s.precomposedStringWithCanonicalMapping
+        let nfd = s.decomposedStringWithCanonicalMapping
+        return nfc == nfd ? [nfc] : [nfc, nfd]
+    }
+
     /// Filenames via Spotlight, scoped to `root`. Used when fd is not installed —
     /// `-onlyin` keeps it fast and free of global noise (Nix Store, system files).
     static func mdfindNames(root: URL, needle: String, cap: Int) -> [URL]? {
@@ -815,12 +823,13 @@ enum PaletteSearch {
 
     static func rgContent(root: URL, needle: String, cap: Int) -> [URL]? {
         guard let rg = ExternalTools.path("rg") else { return nil }
-        // Skip big files and cap the time so content search never hangs.
-        let lines = ExternalTools.run(rg, [
-            "--color=never", "--files-with-matches", "--smart-case",
-            "--max-count", "1", "--no-messages", "--max-filesize", "2M",
-            "--", needle, root.path
-        ], maxLines: cap, timeout: 3.0)
+        // Skip big files and cap the time so content search never hangs. Search
+        // both Unicode normalizations (rg byte-matches; IME text may be NFC/NFD).
+        var args = ["--color=never", "--files-with-matches", "--smart-case",
+                    "--max-count", "1", "--no-messages", "--max-filesize", "2M"]
+        for v in normalizationVariants(needle) { args += ["-e", v] }
+        args += [root.path]
+        let lines = ExternalTools.run(rg, args, maxLines: cap, timeout: 3.0)
         return lines.map { URL(fileURLWithPath: $0) }
     }
 
@@ -839,16 +848,18 @@ enum PaletteSearch {
         let files = ExternalTools.run(fd, args, maxLines: scanLimit, timeout: 2.0)
         guard !files.isEmpty else { return [] }
 
-        // Check archives in parallel (each unzip+grep is its own subprocess), so
-        // the total time is roughly the slowest file rather than the sum.
-        let q = shQuote(needle)
+        // Match both Unicode normalizations of the needle: Korean text typed via
+        // the IME is often NFC while filesystem/other sources are NFD (or vice
+        // versa), and `grep -F` compares raw bytes. Searching both forms makes the
+        // result normalization-insensitive.
+        let patterns = normalizationVariants(needle).map { "-e " + shQuote($0) }.joined(separator: " ")
         let lock = NSLock()
         var matched: [URL] = []
         DispatchQueue.concurrentPerform(iterations: files.count) { i in
             lock.lock(); let enough = matched.count >= cap; lock.unlock()
             if enough { return }
             let f = files[i]
-            let cmd = "unzip -p \(shQuote(f)) 2>/dev/null | grep -aqF -- \(q) && echo Y"
+            let cmd = "unzip -p \(shQuote(f)) 2>/dev/null | grep -aqF \(patterns) && echo Y"
             if ExternalTools.run("/bin/sh", ["-c", cmd], maxLines: 1, timeout: 2.0).first == "Y" {
                 lock.lock(); if matched.count < cap { matched.append(URL(fileURLWithPath: f)) }; lock.unlock()
             }
