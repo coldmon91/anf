@@ -16,6 +16,7 @@
       <a href="#features">기능</a>
       <a href="#terminal">터미널</a>
       <a href="#palette">팔레트</a>
+      <a href="#shortcuts">단축키</a>
       <a href="#tools">권장 도구</a>
       <a href="#opensource">오픈소스</a>
       <a href="https://github.com/rescenedev/anf" target="_blank" rel="noopener">GitHub</a>
@@ -61,7 +62,7 @@
         <div class="tile">
           <div class="ic">⌘K</div>
           <h3>커맨드 팔레트</h3>
-          <p>어디서든 ⌘K로 검색. 핀 → 최근 방문 → 즐겨찾기 순으로 보이고, 현재 폴더 아래를 재귀 탐색해 바로 점프합니다.</p>
+          <p>어디서든 ⌘K. 파일명은 Spotlight 색인으로 전역 즉시 검색, 내용은 ripgrep으로 — 핀 · 최근 · 즐겨찾기에서 바로 점프합니다.</p>
         </div>
         <div class="tile">
           <div class="ic">❯_</div>
@@ -116,40 +117,53 @@
       </div>
       <ul class="ticks centered-list">
         <li>빈 상태: 핀 → 최근 방문 → 즐겨찾기 순</li>
-        <li>2글자 이상 입력 시 현재 폴더 아래 재귀 검색 (fd·ripgrep 활용)</li>
+        <li>파일명은 Spotlight 색인으로 전역 즉시 검색 (내장 퍼지 랭킹)</li>
+        <li>내용 일치는 ripgrep으로 따로 구분해서 표시</li>
         <li>폴더는 이동, 파일은 위치로 점프해 선택</li>
       </ul>
     </div>
   </section>
 
+  <!-- Shortcuts -->
+  <section id="shortcuts" class="showcase">
+    <h2 class="centered">손은 키보드에.</h2>
+    <p class="sub centered">자주 쓰는 동작은 모두 단축키로.</p>
+    <div class="keys">
+      <div class="key-row"><span class="ks"><kbd>⌘K</kbd></span><span class="kd">커맨드 팔레트 (검색)</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘1</kbd><kbd>⌘2</kbd><kbd>⌘3</kbd><kbd>⌘4</kbd></span><span class="kd">창 분할 — 단일 · 2분할 좌우 · 상하 · 4분할</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘[</kbd><kbd>⌘]</kbd></span><span class="kd">보기 모드 순환 (리스트 · 아이콘 · 컬럼 …)</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘⇧[</kbd><kbd>⌘⇧]</kbd></span><span class="kd">사이드바 열기 · 닫기</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌃`</kbd></span><span class="kd">터미널 토글</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘+</kbd><kbd>⌘−</kbd></span><span class="kd">글자 크기 (텍스트 미리보기 · 터미널)</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘T</kbd><kbd>⌘W</kbd></span><span class="kd">새 탭 · 탭 닫기</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘⌥1–9</kbd></span><span class="kd">탭 선택</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘↑</kbd><kbd>⌘↓</kbd></span><span class="kd">상위 폴더 · 열기</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘C</kbd><kbd>⌘X</kbd><kbd>⌘V</kbd></span><span class="kd">복사 · 잘라내기 · 붙여넣기</span></div>
+      <div class="key-row"><span class="ks"><kbd>Space</kbd></span><span class="kd">훑어보기 (Quick Look)</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘I</kbd></span><span class="kd">인스펙터 열기 · 닫기</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘⇧D</kbd></span><span class="kd">현재 폴더 즐겨찾기 토글</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘⌫</kbd></span><span class="kd">휴지통으로 이동</span></div>
+    </div>
+  </section>
+
   <!-- Recommended tools -->
   <section id="tools" class="showcase">
-    <h2 class="centered">설치하면 더 강력해집니다.</h2>
-    <p class="sub centered">아래 도구가 설치되어 있으면 anf가 자동으로 감지해 활용합니다. 모두 선택 사항입니다.</p>
+    <h2 class="centered">검색은 기본, 더 강력하게.</h2>
+    <p class="sub centered">파일명 검색은 macOS Spotlight 색인 + 내장 퍼지 매칭으로 즉시 동작합니다 — 설치 불필요. 아래는 선택 사항입니다.</p>
 
     <div class="install-all">
-      <span class="install-label">한 번에 설치</span>
+      <span class="install-label">한 번에 설치 (선택)</span>
       <div class="install-row">
-        <code id="cmd-all">brew install fd ripgrep fzf && brew install --cask postmelee/tap/alhangeul</code>
+        <code id="cmd-all">brew install ripgrep && brew install --cask postmelee/tap/alhangeul</code>
         <button class="copy-btn" type="button" data-target="cmd-all">복사</button>
       </div>
     </div>
 
     <div class="grid tools-grid">
       <div class="tile">
-        <h3>fd</h3>
-        <p>커맨드 팔레트 파일명 검색을 더 빠르고 깊게.</p>
-        <div class="cmd"><code id="cmd-fd">brew install fd</code><button class="copy-btn mini" type="button" data-target="cmd-fd">복사</button></div>
-      </div>
-      <div class="tile">
         <h3>ripgrep</h3>
-        <p>파일 <strong>내용</strong>까지 검색 (없으면 파일명만).</p>
+        <p>커맨드 팔레트에서 파일 <strong>내용</strong>까지 검색.</p>
         <div class="cmd"><code id="cmd-rg">brew install ripgrep</code><button class="copy-btn mini" type="button" data-target="cmd-rg">복사</button></div>
-      </div>
-      <div class="tile">
-        <h3>fzf</h3>
-        <p>검색 결과를 퍼지 매칭으로 더 똑똑하게 정렬.</p>
-        <div class="cmd"><code id="cmd-fzf">brew install fzf</code><button class="copy-btn mini" type="button" data-target="cmd-fzf">복사</button></div>
       </div>
       <div class="tile">
         <h3><a href="https://postmelee.github.io/alhangeul-macos/" target="_blank" rel="noopener">알한글 ↗</a></h3>
@@ -157,7 +171,7 @@
         <div class="cmd"><code id="cmd-al">brew install --cask postmelee/tap/alhangeul</code><button class="copy-btn mini" type="button" data-target="cmd-al">복사</button></div>
       </div>
     </div>
-    <p class="note centered">설치되어 있지 않아도 anf는 정상 동작합니다 — 내장 검색으로 폴백합니다.</p>
+    <p class="note centered">파일명 검색은 별도 설치 없이 동작합니다. ripgrep은 내용 검색, 알한글은 한글 미리보기용입니다.</p>
   </section>
 
   <!-- Open Source -->

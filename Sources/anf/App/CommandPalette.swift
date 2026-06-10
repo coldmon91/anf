@@ -33,9 +33,12 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     private var table: NSTableView!
     private var results: [Target] = []
     private var deepResults: [Target] = []
-    private var deepTask: Task<Void, Never>?
+    private let metadata = MetadataFileSearch()
+    private var contentTask: Task<Void, Never>?
+    private var nameTargets: [Target] = []
     private var searching = false
     private var placeholder: NSTextField!
+    private var spinner: NSProgressIndicator!
 
     private let panelWidth: CGFloat = 760
     private let rowHeight: CGFloat = 36
@@ -74,7 +77,9 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     func hide() {
         guard isShown else { return }
         isShown = false
-        deepTask?.cancel()
+        metadata.stop()
+        contentTask?.cancel()
+        searching = false
         if let panel {
             anchorWindow?.removeChildWindow(panel)
             panel.orderOut(nil)
@@ -103,6 +108,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
             backing: .buffered, defer: false)
         panel.isFloatingPanel = true
         panel.level = .floating
+        panel.isMovableByWindowBackground = true   // drag the palette by its body
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
@@ -204,7 +210,15 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
             scroll.heightAnchor.constraint(equalToConstant: tableHeight),
         ])
 
-        // Centered status text ("검색 중…" / "결과 없음") shown when no rows.
+        // Centered status: a spinner + text ("검색 중…" / "결과 없음") shown when
+        // there are no rows yet.
+        let spinner = NSProgressIndicator()
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.isDisplayedWhenStopped = false
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        blur.addSubview(spinner)
+
         let placeholder = NSTextField(labelWithString: "")
         placeholder.font = .systemFont(ofSize: 15)
         placeholder.textColor = .secondaryLabelColor
@@ -213,9 +227,14 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         placeholder.translatesAutoresizingMaskIntoConstraints = false
         blur.addSubview(placeholder)
         NSLayoutConstraint.activate([
+            spinner.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
+            spinner.topAnchor.constraint(equalTo: scroll.topAnchor, constant: 44),
+            spinner.widthAnchor.constraint(equalToConstant: 18),
+            spinner.heightAnchor.constraint(equalToConstant: 18),
             placeholder.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
-            placeholder.topAnchor.constraint(equalTo: scroll.topAnchor, constant: 40),
+            placeholder.topAnchor.constraint(equalTo: spinner.bottomAnchor, constant: 12),
         ])
+        self.spinner = spinner
         self.placeholder = placeholder
 
         panel.setContentSize(NSSize(width: panelWidth,
@@ -303,36 +322,68 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     /// Show "검색 중…" while a deep search runs, "결과 없음" when it finishes empty,
     /// and nothing when there are results (or the query is empty).
     private func updatePlaceholder() {
-        guard let placeholder else { return }
+        guard let placeholder, let spinner else { return }
         if !results.isEmpty || query.isEmpty {
             placeholder.isHidden = true
+            spinner.stopAnimation(nil)
         } else {
             placeholder.isHidden = false
             placeholder.stringValue = searching ? "검색 중…" : "결과 없음"
+            if searching { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
         }
     }
 
     private func startDeepSearch() {
-        deepTask?.cancel()
+        contentTask?.cancel()
         let q = query
-        guard q.count >= 2, let root = workspace?.active.currentURL else {
-            searching = false
+        guard q.count >= 2 else {
+            metadata.stop(); searching = false
+            nameTargets = []
             if !deepResults.isEmpty { deepResults = [] }
             return
         }
         searching = true
-        deepTask = Task { [weak self] in
-            let found = await Task.detached(priority: .userInitiated) {
-                PaletteSearch.scan(root: root, needle: q)
-            }.value
-            guard !Task.isCancelled, let self else { return }
-            // Ignore stale results if the query changed meanwhile.
-            if self.query == q {
-                self.searching = false
-                self.deepResults = found
-                self.recompute()
+        nameTargets = []
+        deepResults = []
+
+        // 1) Filenames — Spotlight index (NSMetadataQuery), ranked by Swift fuzzy.
+        metadata.onResults = { [weak self] urls in
+            guard let self, self.query == q else { return }
+            var ranked = FuzzyMatch.rank(urls, query: q, limit: 60)
+            if ranked.isEmpty, let root = self.workspace?.active.currentURL {
+                ranked = PaletteSearch.fmNames(root: root, needle: q, maxDepth: 4, cap: 60)
             }
+            self.nameTargets = ranked.map { Self.target(for: $0, content: false) }
+            self.deepResults = self.nameTargets
+            self.recompute()
+            self.startContentSearch(q)
         }
+        metadata.search(q)
+    }
+
+    /// 2) Contents — ripgrep over the current folder, shown under a divider.
+    private func startContentSearch(_ q: String) {
+        guard let root = workspace?.active.currentURL else {
+            searching = false; recompute(); return
+        }
+        contentTask = Task { [weak self] in
+            let urls = await Task.detached(priority: .userInitiated) {
+                PaletteSearch.rgContent(root: root, needle: q, cap: 40)
+            }.value
+            guard let self, self.query == q else { return }
+            let content = urls.map { Self.target(for: $0, content: true) }
+            self.searching = false
+            self.deepResults = self.nameTargets + content
+            self.recompute()
+        }
+    }
+
+    private static func target(for url: URL, content: Bool) -> Target {
+        let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+        return Target(
+            name: url.lastPathComponent, url: url,
+            symbol: content ? "doc.text.magnifyingglass" : (isDir ? "folder" : "doc"),
+            isFile: !isDir, isContent: content)
     }
 
     private func activateSelection() {
@@ -501,59 +552,15 @@ private final class PaletteRowBackground: NSTableRowView {
     override var isEmphasized: Bool { get { true } set {} }
 }
 
-/// Recursive search used by the palette. Uses optional CLI tools when present —
-/// `fd` for fast/deep filename matching, `ripgrep` for file *content* matching,
-/// `fzf` for fuzzy ranking — and falls back to a bounded FileManager walk when
-/// none are installed. anf works either way; the tools just make it faster and
-/// add content search.
+/// Search backends for the palette's deep search. Filename matching is done via
+/// the Spotlight index (`MetadataFileSearch`) + Swift fuzzy ranking; this enum
+/// provides the ripgrep CONTENT search and a FileManager filename fallback used
+/// when Spotlight returns nothing.
 enum PaletteSearch {
-    static func scan(root: URL, needle: String, maxDepth: Int = 4,
-                     cap: Int = 120) -> [CommandPaletteController.Target] {
-        var results: [CommandPaletteController.Target] = []
-        var seen = Set<String>()
+    // MARK: - FileManager fallback (filenames, when Spotlight is unavailable)
 
-        func add(_ url: URL, content: Bool) {
-            let key = url.standardizedFileURL.path
-            guard seen.insert(key).inserted, results.count < cap else { return }
-            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-            results.append(.init(
-                name: url.lastPathComponent, url: url,
-                symbol: content ? "doc.text.magnifyingglass" : (isDir ? "folder" : "doc"),
-                isFile: !isDir, isContent: content))
-        }
-
-        // 1) Filename matches — fd if available, else a FileManager walk.
-        var names = fdNames(root: root, needle: needle, cap: cap)
-            ?? fmNames(root: root, needle: needle, maxDepth: maxDepth, cap: cap)
-        // Fuzzy-rank with fzf when present (purely reorders the candidate set).
-        names = fzfRank(names, query: needle) ?? names
-        for url in names where results.count < cap { add(url, content: false) }
-
-        // 2) Content matches — ripgrep, appended after filename hits.
-        if results.count < cap, !Task.isCancelled {
-            for url in rgContent(root: root, needle: needle, cap: cap - results.count) {
-                add(url, content: true)
-            }
-        }
-        return results
-    }
-
-    // MARK: - fd (filenames)
-
-    private static func fdNames(root: URL, needle: String, cap: Int) -> [URL]? {
-        guard let fd = ExternalTools.path("fd") else { return nil }
-        let lines = ExternalTools.run(fd, [
-            "--color=never", "--absolute-path", "--no-ignore",
-            "--fixed-strings", "--type", "f", "--type", "d",
-            "--max-results", "\(cap)", needle, root.path
-        ], maxLines: cap)
-        return lines.map { URL(fileURLWithPath: $0) }
-    }
-
-    // MARK: - FileManager fallback
-
-    private static func fmNames(root: URL, needle: String,
-                                maxDepth: Int, cap: Int) -> [URL] {
+    static func fmNames(root: URL, needle: String,
+                        maxDepth: Int, cap: Int) -> [URL] {
         let fm = FileManager.default
         guard let en = fm.enumerator(
             at: root,
@@ -571,21 +578,9 @@ enum PaletteSearch {
         return urls
     }
 
-    // MARK: - fzf (fuzzy ranking)
-
-    private static func fzfRank(_ urls: [URL], query: String) -> [URL]? {
-        guard urls.count > 1, let fzf = ExternalTools.path("fzf") else { return nil }
-        let byPath = Dictionary(urls.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
-        let input = urls.map(\.path).joined(separator: "\n")
-        let ranked = ExternalTools.run(fzf, ["--filter", query],
-                                       stdin: input, maxLines: urls.count)
-            .compactMap { byPath[$0] }
-        return ranked.isEmpty ? nil : ranked
-    }
-
     // MARK: - ripgrep (content)
 
-    private static func rgContent(root: URL, needle: String, cap: Int) -> [URL] {
+    static func rgContent(root: URL, needle: String, cap: Int) -> [URL] {
         guard let rg = ExternalTools.path("rg") else { return [] }
         let lines = ExternalTools.run(rg, [
             "--color=never", "--files-with-matches", "--smart-case",

@@ -228,6 +228,28 @@ h2 {
 }
 a.tile:hover { border-color: var(--accent); }
 
+/* ---- Shortcuts ---- */
+.keys {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2px 36px;
+  max-width: 940px; margin: 52px auto 0;
+}
+.key-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 13px 4px; border-bottom: 1px solid var(--line); text-align: left;
+}
+.key-row .ks { display: inline-flex; gap: 5px; flex: 0 0 auto; }
+.key-row .kd { color: var(--txt-dim); font-size: 14.5px; }
+kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 27px; padding: 0 8px;
+  border-radius: 7px; border: 1px solid var(--line);
+  background: var(--tile); color: var(--txt);
+  font-size: 12.5px; font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  box-shadow: 0 1px 0 rgba(0,0,0,.45);
+}
+@media (max-width: 880px) { .keys { grid-template-columns: 1fr; } }
+
 /* ---- Closing CTA ---- */
 .closing { max-width: 1080px; margin: 0 auto; padding: 110px 22px; text-align: center; }
 .closing .cta { margin-top: 32px; }

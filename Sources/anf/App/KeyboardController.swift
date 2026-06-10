@@ -120,11 +120,11 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
             case 125: model.openSelected(); return true   // ⌘↓ open
             case 126: model.goUp(); refocusContent(); return true // ⌘↑ enclosing folder
             case 51:  model.trashSelection(); return true // ⌘⌫ trash
-            case 33:  // [ — ⌘[ cycle view mode back, ⌘⇧[ show sidebar
-                if shift { setSidebar(collapsed: false) } else { cycleViewMode(-1) }
+            case 33:  // [ — ⌘[ view mode back, ⌘⇧[ toggle LEFT sidebar
+                if shift { toggleLeftSidebar() } else { cycleViewMode(-1) }
                 return true
-            case 30:  // ] — ⌘] cycle view mode forward, ⌘⇧] hide sidebar
-                if shift { setSidebar(collapsed: true) } else { cycleViewMode(1) }
+            case 30:  // ] — ⌘] view mode forward, ⌘⇧] toggle RIGHT sidebar (inspector)
+                if shift { workspace.inspectorVisible.toggle() } else { cycleViewMode(1) }
                 return true
             default: break
             }
@@ -139,12 +139,12 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
         model.viewMode = all[(i + dir + all.count) % all.count]
     }
 
-    /// ⌘⇧[ shows the sidebar, ⌘⇧] hides it — drives the native split item.
-    private func setSidebar(collapsed: Bool) {
+    /// ⌘⇧[ toggles the native left sidebar (the split item).
+    private func toggleLeftSidebar() {
         guard let split = NSApp.keyWindow?.contentViewController as? NSSplitViewController,
               let item = split.splitViewItems.first else { return }
-        item.animator().isCollapsed = collapsed
-        workspace.sidebarVisible = !collapsed
+        item.animator().isCollapsed.toggle()
+        workspace.sidebarVisible = !item.isCollapsed
     }
 
     /// ⌘+ / ⌘−: when the inspector is showing a plain-text preview, scale its
