@@ -41,6 +41,10 @@ final class BrowserModel: Identifiable {
     // Selection — changing it marks this tab/pane as the active one.
     var selection: Set<FileItem.ID> = [] { didSet { onActivity?() } }
 
+    /// Live column count of the icon grid, reported by the view, so ↑/↓ can jump a
+    /// whole row instead of stepping one item.
+    @ObservationIgnored var gridColumns: Int = 1
+
     /// Called whenever the user interacts here, so the owning pane can become active.
     @ObservationIgnored var onActivity: (() -> Void)?
 
@@ -357,18 +361,20 @@ final class BrowserModel: Identifiable {
 
     /// Move the (single) selection up/down the visible list.
     func moveSelection(by delta: Int, extend: Bool = false) {
-        let ids = items.map(\.id)
-        guard !ids.isEmpty else { return }
-        let anchor = selectedItems.first?.id
-        let idx = anchor.flatMap { ids.firstIndex(of: $0) }
+        let n = items.count
+        guard n > 0 else { return }
+        // Find the anchor index by a single scan — never build a 26k-element id
+        // array per keystroke (that was the arrow-key lag in huge folders).
+        let anchorID = selection.first
+        let idx = anchorID.flatMap { id in items.firstIndex { $0.id == id } }
         let next: Int
-        if let idx { next = min(max(idx + delta, 0), ids.count - 1) }
-        else { next = delta >= 0 ? 0 : ids.count - 1 }
+        if let idx { next = min(max(idx + delta, 0), n - 1) }
+        else { next = delta >= 0 ? 0 : n - 1 }
         if extend, let idx {
             let lo = min(idx, next), hi = max(idx, next)
-            selection.formUnion(ids[lo...hi])
+            for i in lo...hi { selection.insert(items[i].id) }
         } else {
-            selection = [ids[next]]
+            selection = [items[next].id]
         }
     }
 
