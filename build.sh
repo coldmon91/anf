@@ -21,8 +21,17 @@ cp "$BIN" "$BIN_DIR/anf"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 [ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns "$RES_DIR/AppIcon.icns"
 
-# Ad-hoc sign so Quick Look / file access work without Gatekeeper friction.
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+# Sign with the stable self-signed identity if present (keeps TCC file-access
+# permissions across rebuilds); fall back to ad-hoc otherwise.
+# Set up once with: ./tools/setup-signing.sh
+SIGN_ID="anf-dev"
+if security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_ID" \
+   && codesign --force --deep --sign "$SIGN_ID" "$APP" >/dev/null 2>&1; then
+    echo "▸ Signed with '$SIGN_ID' (stable identity)"
+else
+    codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+    echo "▸ Ad-hoc signed (run ./tools/setup-signing.sh for persistent permissions)"
+fi
 
 echo "✓ Built $APP"
 

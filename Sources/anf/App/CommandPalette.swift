@@ -38,10 +38,12 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     private var nameTargets: [Target] = []
     private var contentTargets: [Target] = []
     private var searching = false
+    private var contentScanning = false
     private var debounce: DispatchWorkItem?
     private var placeholder: NSTextField!
     private var spinner: NSProgressIndicator!
     private var scanLabel: NSTextField!
+    private var footer: NSTextField!
     private var scanTimer: Timer?
     private var scanDirs: [String] = []
     private var scanIdx = 0
@@ -89,6 +91,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         contentTask?.cancel()
         stopScanTimer()
         searching = false
+        contentScanning = false
         if let panel {
             anchorWindow?.removeChildWindow(panel)
             panel.orderOut(nil)
@@ -260,9 +263,27 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
             scanLabel.leadingAnchor.constraint(greaterThanOrEqualTo: blur.leadingAnchor, constant: 24),
             scanLabel.trailingAnchor.constraint(lessThanOrEqualTo: blur.trailingAnchor, constant: -24),
         ])
+        // Footer ticker: shows the directory being content-scanned (ripgrep) even
+        // after filename results are already on screen.
+        let footer = NSTextField(labelWithString: "")
+        footer.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        footer.textColor = .tertiaryLabelColor
+        footer.alignment = .center
+        footer.lineBreakMode = .byTruncatingMiddle
+        footer.isHidden = true
+        footer.translatesAutoresizingMaskIntoConstraints = false
+        blur.addSubview(footer)
+        NSLayoutConstraint.activate([
+            footer.centerXAnchor.constraint(equalTo: blur.centerXAnchor),
+            footer.bottomAnchor.constraint(equalTo: blur.bottomAnchor, constant: -10),
+            footer.leadingAnchor.constraint(greaterThanOrEqualTo: blur.leadingAnchor, constant: 24),
+            footer.trailingAnchor.constraint(lessThanOrEqualTo: blur.trailingAnchor, constant: -24),
+        ])
+
         self.spinner = spinner
         self.placeholder = placeholder
         self.scanLabel = scanLabel
+        self.footer = footer
 
         panel.setContentSize(NSSize(width: panelWidth,
                                     height: fieldHeight + 1 + 6 + tableHeight + 8))
@@ -354,19 +375,23 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     /// Show "검색 중…" while a deep search runs, "결과 없음" when it finishes empty,
     /// and nothing when there are results (or the query is empty).
     private func updatePlaceholder() {
-        guard let placeholder, let spinner, let scanLabel else { return }
-        let showStatus = results.isEmpty && !query.isEmpty
-        if showStatus && searching {
-            placeholder.isHidden = false
-            placeholder.stringValue = "검색 중…"
-            spinner.startAnimation(nil)
+        guard let placeholder, let spinner, let scanLabel, let footer else { return }
+        let emptyStatus = results.isEmpty && !query.isEmpty
+        let centerTicker = emptyStatus && searching
+        // Center status (no results yet).
+        placeholder.isHidden = !emptyStatus
+        if emptyStatus { placeholder.stringValue = searching ? "검색 중…" : "결과 없음" }
+        if centerTicker { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
+        // Footer ticker (content search still running while results are shown).
+        let footerTicker = contentScanning && !results.isEmpty
+        footer.isHidden = !footerTicker
+        // Run the directory ticker while either status is active.
+        if centerTicker || footerTicker {
             startScanTimer()
         } else {
-            placeholder.isHidden = !showStatus
-            if showStatus { placeholder.stringValue = "결과 없음" }
-            spinner.stopAnimation(nil)
             stopScanTimer()
             scanLabel.stringValue = ""
+            footer.stringValue = ""
         }
     }
 
@@ -378,8 +403,9 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
             MainActor.assumeIsolated {
                 guard let self, !self.scanDirs.isEmpty else { return }
                 self.scanIdx += 5
-                let path = self.scanDirs[self.scanIdx % self.scanDirs.count]
-                scanLabel.stringValue = self.abbreviate(path)
+                let abbr = self.abbreviate(self.scanDirs[self.scanIdx % self.scanDirs.count])
+                scanLabel.stringValue = abbr
+                self.footer?.stringValue = "내용 검색 중  ·  \(abbr)"
             }
         }
     }
@@ -412,6 +438,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
             return
         }
         searching = true
+        contentScanning = false
         nameTargets = []; contentTargets = []
         deepResults = []
         // Scan animation paths: prefer the built index; before it's ready, use the
@@ -446,6 +473,8 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
 
     /// 2) Contents via ripgrep over the same folder, appended after the divider.
     private func startContentSearch(_ q: String, root: URL) {
+        contentScanning = true
+        updatePlaceholder()                    // start the footer scan ticker
         contentTask = Task { [weak self] in
             let urls = await Task.detached(priority: .userInitiated) {
                 // ripgrep → mdfind content (Spotlight, scoped) when rg is absent.
@@ -455,6 +484,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
             guard let self, self.query == q else { return }
             self.contentTargets = urls.map { Self.target(for: $0, content: true) }
             self.searching = false
+            self.contentScanning = false
             self.mergeDeep()
         }
     }
