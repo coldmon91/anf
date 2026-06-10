@@ -85,11 +85,13 @@ strong { color: var(--txt); font-weight: 600; }
 .cta { display: flex; gap: 14px; justify-content: center; }
 .btn {
   padding: 13px 26px; border-radius: 980px; font-size: 16px; font-weight: 600;
+  background: var(--tile); border: 1px solid var(--line); color: var(--txt);
   transition: transform .12s, background .15s, border-color .15s, color .15s;
 }
+.btn:hover { border-color: rgba(255,255,255,.32); background: rgba(255,255,255,.06); }
 .btn:active { transform: translateY(1px); }
-.btn.primary { background: var(--accent); color: #fff; }
-.btn.primary:hover { background: #1f86ec; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: #1f86ec; border-color: #1f86ec; }
 .btn.heart { border: 1px solid var(--line); color: var(--txt); }
 .btn.heart:hover { border-color: #ff5e8a; color: #ff8fc0; }
 /* Sponsor heart — always pink, with a soft glow */
@@ -242,13 +244,14 @@ h2 {
   display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 52px;
 }
 .duo.trio { grid-template-columns: repeat(3, 1fr); }
+.duo.quad { grid-template-columns: repeat(2, 1fr); }
 .duo-item { display: flex; flex-direction: column; gap: 14px; }
 .duo-item img {
   width: 100%; border-radius: var(--radius); border: 1px solid var(--line);
   box-shadow: 0 24px 60px rgba(0,0,0,.5);
 }
 .duo-item figcaption { color: var(--txt-dim); font-size: 14.5px; text-align: center; }
-@media (max-width: 880px) { .duo, .duo.trio { grid-template-columns: 1fr; } }
+@media (max-width: 880px) { .duo, .duo.trio, .duo.quad { grid-template-columns: 1fr; } }
 
 /* ---- Open source ---- */
 .oss-head {
