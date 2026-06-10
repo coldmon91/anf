@@ -103,7 +103,7 @@
       <div class="tile">
         <div class="ic">⌖</div>
         <h3>백그라운드 파일 인덱싱</h3>
-        <p>폴더에 들어가는 순간 <code>fd</code>로 하위 전체를 백그라운드 인덱싱. 검색은 그 인메모리 리스트를 필터링해 키 입력마다 디스크를 훑지 않습니다.</p>
+        <p>포커스된 폴더 하위를 <code>fd</code>로 백그라운드 인덱싱하고, 검색은 그 인메모리 리스트를 필터링 — 키 입력마다 디스크를 훑지 않습니다. 인덱스는 checkpoint로 저장돼 재시작해도 즉시 이어집니다.</p>
       </div>
       <div class="tile">
         <div class="ic">≈</div>
@@ -176,10 +176,12 @@
       <div class="key-row"><span class="ks"><kbd>⌘K</kbd></span><span class="kd">커맨드 팔레트 (검색)</span></div>
       <div class="key-row"><span class="ks"><kbd>⌘1</kbd><kbd>⌘2</kbd><kbd>⌘3</kbd><kbd>⌘4</kbd></span><span class="kd">창 분할 — 단일 · 2분할 좌우 · 상하 · 4분할</span></div>
       <div class="key-row"><span class="ks"><kbd>⌘[</kbd><kbd>⌘]</kbd></span><span class="kd">보기 모드 순환 (리스트 · 아이콘 · 컬럼 …)</span></div>
-      <div class="key-row"><span class="ks"><kbd>⌘⇧[</kbd><kbd>⌘⇧]</kbd></span><span class="kd">사이드바 열기 · 닫기</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘⇧[</kbd><kbd>⌘⇧]</kbd></span><span class="kd">좌측 사이드바 · 우측 인스펙터 토글</span></div>
+      <div class="key-row"><span class="ks"><kbd>Tab</kbd><kbd>⇧Tab</kbd></span><span class="kd">pane 이동</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌃Tab</kbd><kbd>⌃⇧Tab</kbd></span><span class="kd">현재 pane 탭 이동</span></div>
       <div class="key-row"><span class="ks"><kbd>⌃`</kbd></span><span class="kd">터미널 토글</span></div>
       <div class="key-row"><span class="ks"><kbd>⌘+</kbd><kbd>⌘−</kbd></span><span class="kd">글자 크기 (텍스트 미리보기 · 터미널)</span></div>
-      <div class="key-row"><span class="ks"><kbd>⌘T</kbd><kbd>⌘W</kbd></span><span class="kd">새 탭 · 탭 닫기</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘T</kbd><kbd>⌘W</kbd></span><span class="kd">새 탭 · 탭 닫기 (마지막 탭이면 pane 닫기)</span></div>
       <div class="key-row"><span class="ks"><kbd>⌘⌥1–9</kbd></span><span class="kd">탭 선택</span></div>
       <div class="key-row"><span class="ks"><kbd>⌘↑</kbd><kbd>⌘↓</kbd></span><span class="kd">상위 폴더 · 열기</span></div>
       <div class="key-row"><span class="ks"><kbd>⌘←</kbd><kbd>⌘→</kbd></span><span class="kd">폴더 히스토리 이전 · 다음</span></div>
