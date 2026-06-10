@@ -156,6 +156,26 @@ h2 {
   font-family: "SF Mono", ui-monospace, Menlo, monospace;
 }
 
+/* ---- Release notes ---- */
+.release {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 52px;
+  text-align: left;
+}
+.rel-block {
+  background: var(--tile); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 26px;
+}
+.rel-block h3 { font-size: 16px; margin-bottom: 14px; color: var(--accent-2); }
+.rel-block ul { list-style: none; display: grid; gap: 10px; }
+.rel-block li { color: var(--txt-dim); font-size: 14.5px; padding-left: 18px; position: relative; }
+.rel-block li::before { content: "›"; position: absolute; left: 0; color: var(--accent-2); }
+.rel-block li code {
+  display: inline; padding: 1px 6px; background: rgba(255,255,255,.06);
+  border: 1px solid var(--line); border-radius: 6px; font-size: .88em; color: var(--accent-2);
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+}
+@media (max-width: 720px) { .release { grid-template-columns: 1fr; } }
+
 /* ---- Showcase shots ---- */
 .shot { margin: 52px auto 0; max-width: 880px; }
 .shot.wide { max-width: 1080px; }

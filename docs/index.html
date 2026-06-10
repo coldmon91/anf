@@ -20,7 +20,9 @@
       <a href="#shortcuts">단축키</a>
       <a href="#tools">권장 도구</a>
       <a href="#opensource">오픈소스</a>
+      <a href="#release">릴리즈 노트</a>
       <a href="https://github.com/rescenedev/anf" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://fairy.hada.io/@lumen" target="_blank" rel="noopener">후원</a>
     </nav>
   </div>
 </header>
@@ -29,7 +31,7 @@
 
   <!-- Hero -->
   <section class="hero">
-    <div class="badge-row"><span class="badge">곧 출시 · 개발 중</span></div>
+    <div class="badge-row"><span class="badge">2026년 6월 13일 (토) 출시</span></div>
     <p class="eyebrow">all new finder</p>
     <h1>당신의 Finder를 다시 상상하다.</h1>
     <p class="lead">분할 뷰, 내장 터미널, 커맨드 팔레트.<br>macOS를 위한 가볍고 빠른 네이티브 파일 브라우저.</p>
@@ -131,8 +133,13 @@
       </div>
       <div class="tile">
         <div class="ic">▤</div>
-        <h3>검증된 AppKit 뷰 + 캐싱</h3>
-        <p>파일 목록·분할은 <code>NSTableView</code> / <code>NSSplitView</code>. 디렉토리 읽기·아이콘·Quick Look 썸네일은 백그라운드에서 처리하고 캐시로 재사용해 수천 개 항목도 매끄럽습니다.</p>
+        <h3>어떤 폴더든 눈 깜짝할 새</h3>
+        <p>폴더 진입은 <code>getattrlistbulk(2)</code> 네이티브 벌크 읽기 — 항목별 <code>stat</code> 없이 이름·종류·크기·날짜를 몇 번의 시스템 콜로 한 번에. 보통 폴더는 0.01초, 2만 6천 개짜리도 0.1초에 촥 뜹니다.</p>
+      </div>
+      <div class="tile">
+        <div class="ic">▦</div>
+        <h3>네이티브 NSTableView 렌더링</h3>
+        <p>파일 목록은 SwiftUI가 아니라 <code>NSTableView</code>로 직접 그립니다. 화면에 보이는 행만 재활용해, 수만 개 항목도 스크롤·정렬·화살표 이동이 즉각적입니다.</p>
       </div>
       <div class="tile">
         <div class="ic">⏱</div>
@@ -262,12 +269,57 @@
     </div>
   </section>
 
+  <!-- Release notes -->
+  <section id="release" class="band">
+    <div class="band-inner">
+      <h2 class="centered">릴리즈 노트.</h2>
+      <p class="sub centered">v1.0 — 2026년 6월 13일 (토) 첫 출시.</p>
+      <div class="release">
+        <div class="rel-block">
+          <h3>탐색 · 성능</h3>
+          <ul>
+            <li><code>getattrlistbulk(2)</code> 네이티브 벌크 읽기로 2만 6천 개 폴더도 ~0.1초 진입</li>
+            <li>파일 목록을 SwiftUI가 아닌 <code>NSTableView</code>로 렌더링 — 수만 개도 즉각 스크롤·정렬·이동</li>
+            <li>1 · 2분할 · 상하 2행 · 4분할 레이아웃, 분할선 드래그, 레이아웃·보기 형태 기억</li>
+            <li>현재 레이아웃·탭 구성을 이름 붙여 저장하는 <strong>Workspace</strong></li>
+          </ul>
+        </div>
+        <div class="rel-block">
+          <h3>검색 · 미리보기</h3>
+          <ul>
+            <li>⌘K 커맨드 팔레트: 파일명은 fd, 내용은 ripgrep, 백그라운드 인덱스 + 내장 퍼지 랭킹</li>
+            <li><strong>hwpx·docx·pptx·xlsx 본문 검색</strong> 및 인스펙터 텍스트 미리보기 (알한글 불필요)</li>
+            <li>커맨드 팔레트에서 SSH 호스트 바로 연결</li>
+            <li>인스펙터 Quick Look + 가독성 텍스트 뷰어, ⌘± 폰트 크기</li>
+          </ul>
+        </div>
+        <div class="rel-block">
+          <h3>원격 · 터미널</h3>
+          <ul>
+            <li><strong>GUI SFTP</strong> — SSH 호스트를 일반 폴더처럼 탐색 (sshfs·macFUSE 불필요)</li>
+            <li>창 하단 전역 터미널 드로어, 실제 PTY, ⌘± 글자 크기, SSH 한 번에 연결</li>
+            <li>~/.ssh/config 자동 인식 · 라이브 세션 표시</li>
+          </ul>
+        </div>
+        <div class="rel-block">
+          <h3>편집 · 조작</h3>
+          <ul>
+            <li>파인더식 인라인 이름 변경 (별도 팝업 없이 그 자리에서)</li>
+            <li>키보드 중심 단축키, 한글 입력 상태에서도 동작하는 ⌘ 단축키</li>
+            <li>iCloud 미다운로드 인지, 복사·이동·휴지통·중복 등 기본 파일 작업</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Closing CTA -->
   <section class="closing">
-    <h2 class="centered">마음에 드셨나요?</h2>
-    <p class="sub centered">개발 중인 프로젝트입니다. GitHub에서 Star로 응원해 주세요.</p>
+    <h2 class="centered">이번 주 토요일, 만나요.</h2>
+    <p class="sub centered">2026년 6월 13일 (토) 첫 출시. GitHub에서 Star로 응원하고, 후원으로 개발을 도와주세요.</p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/rescenedev/anf" target="_blank" rel="noopener">GitHub에서 보기</a>
+      <a class="btn primary" href="https://github.com/rescenedev/anf" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn" href="https://fairy.hada.io/@lumen" target="_blank" rel="noopener">후원하기</a>
     </div>
   </section>
 
