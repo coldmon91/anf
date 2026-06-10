@@ -18,10 +18,18 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         let isFile: Bool
         var isContent = false   // matched by file content (ripgrep), not name
         var isDivider = false   // non-selectable section header row
+        /// When set, activating this row connects to the SSH host instead of
+        /// navigating to a URL.
+        var sshHost: String? = nil
 
         static func divider(_ title: String) -> Target {
             Target(name: title, url: URL(fileURLWithPath: "/"), symbol: "",
                    isFile: false, isContent: false, isDivider: true)
+        }
+
+        static func ssh(_ host: String, subtitle: String) -> Target {
+            Target(name: host, url: URL(string: "ssh://\(host)") ?? URL(fileURLWithPath: "/"),
+                   symbol: "network", isFile: false, sshHost: host)
         }
     }
 
@@ -47,6 +55,9 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     private var scanTimer: Timer?
     private var scanDirs: [String] = []
     private var scanIdx = 0
+    /// SSH hosts (config + custom) cached when the palette opens, so keystrokes
+    /// don't re-read ~/.ssh/config.
+    private var sshTargets: [Target] = []
 
     private let panelWidth: CGFloat = 760
     private let rowHeight: CGFloat = 36
@@ -75,6 +86,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
 
         field.stringValue = ""
         deepResults = []
+        loadSSHTargets()
         recompute()
         position(over: host)
         host.addChildWindow(panel, ordered: .above)
@@ -294,6 +306,22 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
 
     private var query: String { field?.stringValue ?? "" }
 
+    /// Build the SSH host list (custom hosts first, then ~/.ssh/config) once per
+    /// open. Reading the config off-main keeps the first keystroke snappy.
+    private func loadSSHTargets() {
+        let custom = workspace?.customSSH.hosts.map { $0.target } ?? []
+        var targets: [Target] = custom.map { .ssh($0, subtitle: $0) }
+        Task { @MainActor [weak self] in
+            let hosts = await Task.detached(priority: .utility) { SSHConfig.hosts() }.value
+            var seen = Set(custom)
+            for h in hosts where seen.insert(h.alias).inserted {
+                targets.append(.ssh(h.alias, subtitle: h.subtitle))
+            }
+            self?.sshTargets = targets
+            if self?.isShown == true { self?.recompute() }
+        }
+    }
+
     private func recompute() {
         guard let workspace else { results = []; table?.reloadData(); return }
         let q = query
@@ -313,8 +341,13 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
                 all.append(.init(name: f.name, url: f.url, symbol: f.symbol, isFile: false))
             }
             var seen = Set<String>()
-            results = all.filter { seen.insert($0.url.standardizedFileURL.path).inserted }
-                         .prefix(40).map { $0 }
+            var rows = all.filter { seen.insert($0.url.standardizedFileURL.path).inserted }
+                          .prefix(40).map { $0 }
+            if !sshTargets.isEmpty {
+                rows.append(.divider("SSH"))
+                rows.append(contentsOf: sshTargets)
+            }
+            results = rows
         } else {
             // Local candidates (favorites / recents / current folder) — filter
             // these by name or path so only relevant ones show.
@@ -349,8 +382,14 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
             let contentRows = deepResults.filter { $0.isContent }
                 .filter { seen.insert($0.url.standardizedFileURL.path).inserted }
                 .prefix(40).map { $0 }
+            // Matching SSH hosts surface at the top for quick connect.
+            let sshRows = sshTargets.filter { $0.name.localizedCaseInsensitiveContains(q) }
             // Two labeled sections: name matches (files/folders) and content matches.
             var rows: [Target] = []
+            if !sshRows.isEmpty {
+                rows.append(.divider("SSH"))
+                rows.append(contentsOf: sshRows)
+            }
             if !nameRows.isEmpty {
                 rows.append(.divider("파일 · 폴더"))
                 rows.append(contentsOf: nameRows)
@@ -522,7 +561,8 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         guard results.indices.contains(row), !results[row].isDivider,
               let workspace else { return }
         let t = results[row]
-        if t.isFile { workspace.active.revealFile(t.url) }
+        if let host = t.sshHost { workspace.openSSH(host) }
+        else if t.isFile { workspace.active.revealFile(t.url) }
         else { workspace.active.navigate(to: t.url) }
         hide()
     }
