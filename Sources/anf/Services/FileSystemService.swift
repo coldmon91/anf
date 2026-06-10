@@ -30,9 +30,18 @@ struct FileSystemService: Sendable {
             // if getattrlistbulk is unavailable for this volume.
             if let entries = FastDirRead.list(path: url.path) {
                 let parentPath = url.path
-                return entries.compactMap { e in
-                    (!showHidden && e.isHidden) ? nil : FileItem.fast(parentPath: parentPath, entry: e)
+                // Build the items across all cores — URL construction alone is
+                // ~100ms for 26k entries, so parallelising it is a real win.
+                var out = [FileItem?](repeating: nil, count: entries.count)
+                out.withUnsafeMutableBufferPointer { buf in
+                    DispatchQueue.concurrentPerform(iterations: entries.count) { i in
+                        let e = entries[i]
+                        if showHidden || !e.isHidden {
+                            buf[i] = FileItem.fast(parentPath: parentPath, entry: e)
+                        }
+                    }
                 }
+                return out.compactMap { $0 }
             }
             let fm = FileManager.default
             var options: FileManager.DirectoryEnumerationOptions = [.skipsSubdirectoryDescendants]

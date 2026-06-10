@@ -24,6 +24,10 @@ final class BrowserModel: Identifiable {
     /// recompute only when `allItems`, `sort` or `filterText` actually change.
     private(set) var items: [FileItem] = []
 
+    /// Bumped whenever `items` changes, so the AppKit table view knows to reload
+    /// without diffing the array itself.
+    private(set) var itemsVersion = 0
+
     // Presentation
     var viewMode: ViewMode = .list
     var sort = SortOrder() { didSet { recomputeItems() } }
@@ -68,6 +72,7 @@ final class BrowserModel: Identifiable {
         let fs = self.fs
         if snapshot.count < 2_000 {
             items = fs.filteredSorted(snapshot, filter: filter, by: order)
+            itemsVersion &+= 1
             return
         }
         let token = itemsToken
@@ -76,6 +81,7 @@ final class BrowserModel: Identifiable {
             await MainActor.run { [weak self] in
                 guard let self, self.itemsToken == token else { return }
                 self.items = computed
+                self.itemsVersion &+= 1
             }
         }
     }
