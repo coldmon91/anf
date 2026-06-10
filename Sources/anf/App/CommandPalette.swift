@@ -456,16 +456,22 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         }
         if scanDirs.isEmpty { scanDirs = [root.path] }
 
-        let indexed = FileIndex.shared.snapshot(for: root)   // pre-built list, or nil
-        // 1) Filenames — fuzzy-rank the in-memory index off the main thread
-        // (instant). If the index isn't ready, fall back to a per-query fd.
+        // Cheap COW capture on main (no filtering); the prefix filter + fuzzy run
+        // off the main thread so typing never hitches.
+        let indexed = FileIndex.shared.entriesIfCovers(root)
+        let rootPath = root.standardizedFileURL.path
+        // 1) Filenames — fuzzy-rank the in-memory index off the main thread.
+        // If the index isn't ready, fall back to a per-query fd/mdfind/FileManager.
         deepTask = Task { [weak self] in
             let ranked = await Task.detached(priority: .userInitiated) { () -> [URL] in
-                // fd index → per-query fd → mdfind (Spotlight, scoped) → FileManager.
-                let pool = indexed
-                    ?? PaletteSearch.fdNames(root: root, needle: q, cap: 400)
-                    ?? PaletteSearch.mdfindNames(root: root, needle: q, cap: 400)
-                    ?? PaletteSearch.fmNames(root: root, needle: q, maxDepth: 6, cap: 400)
+                let pool: [URL]
+                if let indexed {
+                    pool = indexed.filter { FileIndex.isUnder($0.path, rootPath) }
+                } else {
+                    pool = PaletteSearch.fdNames(root: root, needle: q, cap: 400)
+                        ?? PaletteSearch.mdfindNames(root: root, needle: q, cap: 400)
+                        ?? PaletteSearch.fmNames(root: root, needle: q, maxDepth: 6, cap: 400)
+                }
                 return FuzzyMatch.rank(pool, query: q, limit: 80)
             }.value
             guard let self, self.query == q else { return }
@@ -782,17 +788,23 @@ enum PaletteSearch {
               FileManager.default.isExecutableFile(atPath: "/usr/bin/unzip") else { return [] }
         var args = ["--color=never", "--absolute-path", "--type", "f"]
         for ext in ["hwpx", "docx", "pptx", "xlsx"] { args += ["--extension", ext] }
-        args += ["--max-results", "\(cap * 3)", ".", root.path]
-        let files = ExternalTools.run(fd, args, maxLines: cap * 3, timeout: 3.0)
+        let scanLimit = 80
+        args += ["--max-results", "\(scanLimit)", ".", root.path]
+        let files = ExternalTools.run(fd, args, maxLines: scanLimit, timeout: 2.0)
+        guard !files.isEmpty else { return [] }
 
+        // Check archives in parallel (each unzip+grep is its own subprocess), so
+        // the total time is roughly the slowest file rather than the sum.
         let q = shQuote(needle)
+        let lock = NSLock()
         var matched: [URL] = []
-        for f in files {
-            if matched.count >= cap { break }
-            // unzip the whole archive to stdout; grep the raw XML for the needle.
+        DispatchQueue.concurrentPerform(iterations: files.count) { i in
+            lock.lock(); let enough = matched.count >= cap; lock.unlock()
+            if enough { return }
+            let f = files[i]
             let cmd = "unzip -p \(shQuote(f)) 2>/dev/null | grep -aqF -- \(q) && echo Y"
             if ExternalTools.run("/bin/sh", ["-c", cmd], maxLines: 1, timeout: 2.0).first == "Y" {
-                matched.append(URL(fileURLWithPath: f))
+                lock.lock(); if matched.count < cap { matched.append(URL(fileURLWithPath: f)) }; lock.unlock()
             }
         }
         return matched
