@@ -45,6 +45,12 @@ final class BrowserModel: Identifiable {
     /// whole row instead of stepping one item.
     @ObservationIgnored var gridColumns: Int = 1
 
+    /// Keyboard-selection anchor/cursor indices. Shift-extension grows the
+    /// selection from the anchor to the moving cursor — a contiguous run in
+    /// list/columns, a rectangle in the icon/gallery grid.
+    @ObservationIgnored private var selAnchor: Int?
+    @ObservationIgnored private var selCursor: Int?
+
     /// Called whenever the user interacts here, so the owning pane can become active.
     @ObservationIgnored var onActivity: (() -> Void)?
 
@@ -363,18 +369,41 @@ final class BrowserModel: Identifiable {
     func moveSelection(by delta: Int, extend: Bool = false) {
         let n = items.count
         guard n > 0 else { return }
-        // Find the anchor index by a single scan — never build a 26k-element id
-        // array per keystroke (that was the arrow-key lag in huge folders).
-        let anchorID = selection.first
-        let idx = anchorID.flatMap { id in items.firstIndex { $0.id == id } }
-        let next: Int
-        if let idx { next = min(max(idx + delta, 0), n - 1) }
-        else { next = delta >= 0 ? 0 : n - 1 }
-        if extend, let idx {
-            let lo = min(idx, next), hi = max(idx, next)
-            for i in lo...hi { selection.insert(items[i].id) }
+        // Current cursor: the tracked one if still in sync with the live selection
+        // (a click/navigation would desync it), else derived from the selection.
+        let current: Int? = {
+            if let c = selCursor, c < n, selection.contains(items[c].id) { return c }
+            return selection.first.flatMap { id in items.firstIndex { $0.id == id } }
+        }()
+        let cursor = min(max((current ?? (delta >= 0 ? -1 : n)) + delta, 0), n - 1)
+
+        if !extend {
+            selAnchor = cursor
+            selCursor = cursor
+            selection = [items[cursor].id]
+            return
+        }
+        let anchor = selAnchor ?? (current ?? cursor)
+        selAnchor = anchor
+        selCursor = cursor
+        let grid = (viewMode == .icons || viewMode == .gallery)
+        if grid {
+            // Rectangle between anchor and cursor (arrow-shaped grid selection).
+            let cols = max(1, gridColumns)
+            let aR = anchor / cols, aC = anchor % cols
+            let cR = cursor / cols, cC = cursor % cols
+            let r0 = min(aR, cR), r1 = max(aR, cR), c0 = min(aC, cC), c1 = max(aC, cC)
+            var sel = Set<FileItem.ID>()
+            for r in r0...r1 {
+                for c in c0...c1 {
+                    let i = r * cols + c
+                    if i < n { sel.insert(items[i].id) }
+                }
+            }
+            selection = sel
         } else {
-            selection = [items[next].id]
+            let lo = min(anchor, cursor), hi = max(anchor, cursor)
+            selection = Set(items[lo...hi].map(\.id))
         }
     }
 
