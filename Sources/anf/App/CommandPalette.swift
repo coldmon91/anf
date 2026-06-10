@@ -33,9 +33,10 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     private var table: NSTableView!
     private var results: [Target] = []
     private var deepResults: [Target] = []
-    private let metadata = MetadataFileSearch()
+    private var deepTask: Task<Void, Never>?
     private var contentTask: Task<Void, Never>?
     private var nameTargets: [Target] = []
+    private var contentTargets: [Target] = []
     private var searching = false
     private var placeholder: NSTextField!
     private var spinner: NSProgressIndicator!
@@ -77,7 +78,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     func hide() {
         guard isShown else { return }
         isShown = false
-        metadata.stop()
+        deepTask?.cancel()
         contentTask?.cancel()
         searching = false
         if let panel {
@@ -115,13 +116,17 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         panel.onResignKey = { [weak self] in self?.hide() }
 
         let blur = NSVisualEffectView()
-        blur.material = .menu
+        // Translucent dark vibrancy so the blurred desktop/content shows through.
+        blur.material = .hudWindow
         blur.blendingMode = .behindWindow
         blur.state = .active
+        blur.isEmphasized = true
         blur.wantsLayer = true
-        blur.layer?.cornerRadius = 14
+        blur.layer?.cornerRadius = 16
         blur.layer?.cornerCurve = .continuous
         blur.layer?.masksToBounds = true
+        blur.layer?.borderWidth = 1
+        blur.layer?.borderColor = NSColor.white.withAlphaComponent(0.08).cgColor
         blur.translatesAutoresizingMaskIntoConstraints = false
         panel.contentView = NSView()
         panel.contentView!.addSubview(blur)
@@ -157,7 +162,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         separator.translatesAutoresizingMaskIntoConstraints = false
 
         // Results table
-        table = NSTableView()
+        table = PaletteTableView()
         table.headerView = nil
         table.backgroundColor = .clear
         table.style = .plain
@@ -169,7 +174,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         table.dataSource = self
         table.delegate = self
         table.target = self
-        table.action = #selector(rowClicked)
+        table.action = #selector(rowClicked)        // single click navigates
         table.doubleAction = #selector(rowActivated)
         let col = NSTableColumn(identifier: .init("main"))
         col.resizingMask = .autoresizingMask
@@ -333,49 +338,52 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         }
     }
 
+    /// Deep search, scoped to the focused folder and below: fd lists filenames
+    /// (ranked by Swift fuzzy) and is shown FIRST, then ripgrep matches file
+    /// contents under a "내용 일치" divider. Both are bounded for speed.
     private func startDeepSearch() {
+        deepTask?.cancel()
         contentTask?.cancel()
         let q = query
-        guard q.count >= 2 else {
-            metadata.stop(); searching = false
-            nameTargets = []
+        guard q.count >= 1, let root = workspace?.active.currentURL else {
+            searching = false; nameTargets = []; contentTargets = []
             if !deepResults.isEmpty { deepResults = [] }
             return
         }
         searching = true
-        nameTargets = []
+        nameTargets = []; contentTargets = []
         deepResults = []
 
-        // 1) Filenames — Spotlight index (NSMetadataQuery), ranked by Swift fuzzy.
-        metadata.onResults = { [weak self] urls in
+        // 1) Filenames via fd (fast, scoped to `root`), ranked by Swift fuzzy.
+        deepTask = Task { [weak self] in
+            let urls = await Task.detached(priority: .userInitiated) {
+                PaletteSearch.fdNames(root: root, needle: q, cap: 300)
+                    ?? PaletteSearch.fmNames(root: root, needle: q, maxDepth: 6, cap: 300)
+            }.value
             guard let self, self.query == q else { return }
-            var ranked = FuzzyMatch.rank(urls, query: q, limit: 60)
-            if ranked.isEmpty, let root = self.workspace?.active.currentURL {
-                ranked = PaletteSearch.fmNames(root: root, needle: q, maxDepth: 4, cap: 60)
-            }
+            let ranked = FuzzyMatch.rank(urls, query: q, limit: 80)
             self.nameTargets = ranked.map { Self.target(for: $0, content: false) }
-            self.deepResults = self.nameTargets
-            self.recompute()
-            self.startContentSearch(q)
+            self.mergeDeep()
+            self.startContentSearch(q, root: root)
         }
-        metadata.search(q)
     }
 
-    /// 2) Contents — ripgrep over the current folder, shown under a divider.
-    private func startContentSearch(_ q: String) {
-        guard let root = workspace?.active.currentURL else {
-            searching = false; recompute(); return
-        }
+    /// 2) Contents via ripgrep over the same folder, appended after the divider.
+    private func startContentSearch(_ q: String, root: URL) {
         contentTask = Task { [weak self] in
             let urls = await Task.detached(priority: .userInitiated) {
                 PaletteSearch.rgContent(root: root, needle: q, cap: 40)
             }.value
             guard let self, self.query == q else { return }
-            let content = urls.map { Self.target(for: $0, content: true) }
+            self.contentTargets = urls.map { Self.target(for: $0, content: true) }
             self.searching = false
-            self.deepResults = self.nameTargets + content
-            self.recompute()
+            self.mergeDeep()
         }
+    }
+
+    private func mergeDeep() {
+        deepResults = nameTargets + contentTargets
+        recompute()
     }
 
     private static func target(for url: URL, content: Bool) -> Target {
@@ -396,7 +404,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         hide()
     }
 
-    @objc private func rowClicked() { /* selection only; activate on Return/double-click */ }
+    @objc private func rowClicked() { activateSelection() }   // single click opens
     @objc private func rowActivated() { activateSelection() }
 
     // MARK: - NSTextFieldDelegate
@@ -463,6 +471,12 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
 }
 
 // MARK: - Panel (borderless windows must opt into key status)
+
+/// Table that lets the palette be dragged from anywhere over the results — a
+/// click still selects/activates a row, but a drag moves the whole panel.
+private final class PaletteTableView: NSTableView {
+    override var mouseDownCanMoveWindow: Bool { true }
+}
 
 private final class PalettePanel: NSPanel {
     var onResignKey: (() -> Void)?
@@ -557,7 +571,19 @@ private final class PaletteRowBackground: NSTableRowView {
 /// provides the ripgrep CONTENT search and a FileManager filename fallback used
 /// when Spotlight returns nothing.
 enum PaletteSearch {
-    // MARK: - FileManager fallback (filenames, when Spotlight is unavailable)
+    // MARK: - fd (filenames, scoped to `root` and below)
+
+    static func fdNames(root: URL, needle: String, cap: Int) -> [URL]? {
+        guard let fd = ExternalTools.path("fd") else { return nil }
+        let lines = ExternalTools.run(fd, [
+            "--color=never", "--absolute-path", "--no-ignore",
+            "--fixed-strings", "--type", "f", "--type", "d",
+            "--max-results", "\(cap)", needle, root.path
+        ], maxLines: cap)
+        return lines.map { URL(fileURLWithPath: $0) }
+    }
+
+    // MARK: - FileManager fallback (filenames, when fd is unavailable)
 
     static func fmNames(root: URL, needle: String,
                         maxDepth: Int, cap: Int) -> [URL] {
