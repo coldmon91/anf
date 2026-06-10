@@ -86,7 +86,7 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
         if !cmd && !opt {
             switch code {
             case 49: toggleQuickLook(); return true                 // space
-            case 36, 76: model.renameSelected(); return true        // return / enter → rename
+            case 36, 76: model.beginRename(); return true           // return / enter → inline rename
             case 48: workspace.cyclePane(shift ? -1 : 1); return true // Tab → switch pane
             case 125: model.moveSelection(by: 1, extend: shift); return true   // ↓
             case 126: model.moveSelection(by: -1, extend: shift); return true  // ↑

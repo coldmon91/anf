@@ -21,6 +21,23 @@ struct FileSystemService: Sendable {
         }.value
     }
 
+    /// Fast first-pass listing: only the keys needed to render names and sort
+    /// (folder-ness), so a directory with tens of thousands of entries paints
+    /// almost instantly. The full `contents(of:)` pass enriches it afterwards.
+    func contentsFast(of url: URL, showHidden: Bool) async -> [FileItem] {
+        await Task.detached(priority: .userInitiated) {
+            let fm = FileManager.default
+            var options: FileManager.DirectoryEnumerationOptions = [.skipsSubdirectoryDescendants]
+            if !showHidden { options.insert(.skipsHiddenFiles) }
+            guard let urls = try? fm.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: Array(FileItem.fastKeys),
+                options: options
+            ) else { return [] }
+            return urls.compactMap { FileItem(fastURL: $0) }
+        }.value
+    }
+
     /// Recursively sum the allocated size of everything under `url`. Off the main thread.
     func directorySize(of url: URL) async -> Int64 {
         await Task.detached(priority: .utility) {

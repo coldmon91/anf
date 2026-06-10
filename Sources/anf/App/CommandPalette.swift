@@ -770,12 +770,14 @@ enum PaletteSearch {
         "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    /// NFC + NFD forms of `s`, de-duplicated. Korean from the IME vs. on-disk text
-    /// can differ only by normalization; byte matchers (grep/rg) need both.
+    /// NFC + NFD forms of `s`, de-duplicated by raw bytes. Korean from the IME vs.
+    /// on-disk text can differ only by normalization; byte matchers (rg) need both.
+    /// NOTE: compare UTF-8 bytes, not the strings — Swift `==` is canonical, so
+    /// `nfc == nfd` is always true for canonically equivalent forms.
     static func normalizationVariants(_ s: String) -> [String] {
         let nfc = s.precomposedStringWithCanonicalMapping
         let nfd = s.decomposedStringWithCanonicalMapping
-        return nfc == nfd ? [nfc] : [nfc, nfd]
+        return Array(nfc.utf8) == Array(nfd.utf8) ? [nfc] : [nfc, nfd]
     }
 
     /// Filenames via Spotlight, scoped to `root`. Used when fd is not installed —
@@ -836,8 +838,12 @@ enum PaletteSearch {
     // MARK: - Document body search (hwpx / docx / pptx / xlsx)
 
     /// ripgrep treats these as binary (they're ZIP+XML), so search their bodies
-    /// by unzipping each to stdout and grepping. Bounded by file count + per-file
-    /// timeout so it stays fast.
+    /// by unzipping each to stdout and matching in Swift. Matching is done in
+    /// Swift (not piped to `grep`) for two reasons: Swift string comparison is
+    /// Unicode-canonical, so it's immune to NFC/NFD differences between IME input
+    /// and document text; and it avoids depending on a `grep` that may be shadowed
+    /// or misconfigured in the app's spawn environment. Bounded by file count +
+    /// per-file timeout so it stays fast.
     static func docContent(root: URL, needle: String, cap: Int) -> [URL] {
         guard let fd = ExternalTools.path("fd"),
               FileManager.default.isExecutableFile(atPath: "/usr/bin/unzip") else { return [] }
@@ -848,20 +854,18 @@ enum PaletteSearch {
         let files = ExternalTools.run(fd, args, maxLines: scanLimit, timeout: 2.0)
         guard !files.isEmpty else { return [] }
 
-        // Match both Unicode normalizations of the needle: Korean text typed via
-        // the IME is often NFC while filesystem/other sources are NFD (or vice
-        // versa), and `grep -F` compares raw bytes. Searching both forms makes the
-        // result normalization-insensitive.
-        let patterns = normalizationVariants(needle).map { "-e " + shQuote($0) }.joined(separator: " ")
         let lock = NSLock()
         var matched: [URL] = []
         DispatchQueue.concurrentPerform(iterations: files.count) { i in
             lock.lock(); let enough = matched.count >= cap; lock.unlock()
             if enough { return }
-            let f = files[i]
-            let cmd = "unzip -p \(shQuote(f)) 2>/dev/null | grep -aqF \(patterns) && echo Y"
-            if ExternalTools.run("/bin/sh", ["-c", cmd], maxLines: 1, timeout: 2.0).first == "Y" {
-                lock.lock(); if matched.count < cap { matched.append(URL(fileURLWithPath: f)) }; lock.unlock()
+            let url = URL(fileURLWithPath: files[i])
+            // Extract only the text-bearing XML (not the whole archive — that dumps
+            // binary entries too, which break UTF-8 decoding). Match in Swift, which
+            // is Unicode-canonical so it's immune to NFC/NFD differences.
+            guard let body = DocumentText.extract(url) else { return }
+            if body.localizedCaseInsensitiveContains(needle) {
+                lock.lock(); if matched.count < cap { matched.append(url) }; lock.unlock()
             }
         }
         return matched

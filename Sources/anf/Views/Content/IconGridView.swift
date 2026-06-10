@@ -25,7 +25,10 @@ struct IconGridView: View {
     @ViewBuilder
     private func tile(_ item: FileItem) -> some View {
         let base = FileTile(item: item, side: model.iconSize,
-                            isSelected: model.selection.contains(item.id))
+                            isSelected: model.selection.contains(item.id),
+                            isEditing: model.editingItemID == item.id,
+                            onCommitRename: { model.commitRename(item, to: $0) },
+                            onCancelRename: { model.cancelRename() })
             .onTapGesture(count: 2) { model.open(item) }
             .onTapGesture { model.selection = [item.id] }
             .contextMenu { FileContextMenu(model: model, item: item) }

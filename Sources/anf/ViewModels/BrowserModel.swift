@@ -221,9 +221,18 @@ final class BrowserModel: Identifiable {
         selection.removeAll()
         if isRemote { reloadRemote(token: token); return }
         Task {
-            let loaded = await fs.contents(of: url, showHidden: hidden)
+            // Phase 1: paint names immediately (cheap keys only). Phase 2: enrich
+            // with size/date/kind. A 27k-entry folder shows instantly instead of
+            // blocking on a full stat of every item.
+            let fast = await fs.contentsFast(of: url, showHidden: hidden)
+            if token == loadToken {
+                allItems = fast
+                recomputeItems()
+                isLoading = false
+            }
+            let full = await fs.contents(of: url, showHidden: hidden)
             guard token == loadToken else { return }   // a newer load superseded us
-            allItems = loaded
+            allItems = full
             recomputeItems()
             isLoading = false
         }
@@ -428,6 +437,29 @@ final class BrowserModel: Identifiable {
         else { FileOperations.openInTerminal(target) }        // fallback: external
     }
 
+    /// The row currently being renamed inline (Finder-style edit in place). The
+    /// content views show an editable field for this item instead of a label.
+    var editingItemID: FileItem.ID?
+
+    /// Begin inline rename on the (single) selection.
+    func beginRename() {
+        guard let item = selectedItems.first else { return }
+        editingItemID = item.id
+    }
+
+    func cancelRename() { editingItemID = nil }
+
+    /// Commit an inline rename; no-op if the name is unchanged or empty.
+    func commitRename(_ item: FileItem, to newName: String) {
+        editingItemID = nil
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != item.name else { return }
+        if let dest = FileOperations.rename(item, to: trimmed) {
+            reload(); selection = [dest]
+        }
+    }
+
+    /// Legacy modal rename (kept for menu use).
     func renameSelected() {
         guard let item = selectedItems.first else { return }
         guard let newName = TextPrompt.run(title: "Rename", message: "New name for “\(item.name)”",

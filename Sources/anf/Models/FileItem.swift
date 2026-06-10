@@ -84,6 +84,32 @@ struct FileItem: Identifiable, Hashable, Sendable {
             contentType: type, isCloudPlaceholder: false)
     }
 
+    /// Minimal keys for the instant first-pass listing (name + folder-ness only).
+    /// Building these for tens of thousands of entries is far cheaper than the full
+    /// stat (no size/date/UTType), so a huge directory paints immediately.
+    static let fastKeys: Set<URLResourceKey> = [
+        .isDirectoryKey, .isPackageKey, .isSymbolicLinkKey, .isHiddenKey,
+        .localizedNameKey, .nameKey,
+    ]
+
+    /// Lightweight item for the first paint. Metadata columns (size/date/kind) fill
+    /// in when the full `FileItem(url:)` pass replaces it.
+    init?(fastURL url: URL) {
+        guard let v = try? url.resourceValues(forKeys: FileItem.fastKeys) else { return nil }
+        self.url = url
+        self.name = v.localizedName ?? v.name ?? url.lastPathComponent
+        self.isDirectory = v.isDirectory ?? false
+        self.isPackage = v.isPackage ?? false
+        self.isApplication = false
+        self.isSymlink = v.isSymbolicLink ?? false
+        self.isHidden = v.isHidden ?? false
+        self.size = 0
+        self.modified = .distantPast
+        self.created = .distantPast
+        self.contentType = nil
+        self.isCloudPlaceholder = false
+    }
+
     init?(url: URL) {
         guard let v = try? url.resourceValues(forKeys: FileItem.resourceKeys) else { return nil }
         self.url = url

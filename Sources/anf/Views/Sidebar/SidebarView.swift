@@ -145,12 +145,19 @@ struct SidebarView: View {
     /// renames or deletes it. The icon mirrors the layout it captured.
     private func viewRow(_ view: SavedView) -> some View {
         let symbol = PaneLayout(rawValue: view.snapshot.layout)?.symbol ?? "square.grid.2x2"
+        let selected = workspace.activeViewID == view.id
         return Label {
             Text(view.name).font(.system(size: 13)).foregroundStyle(.primary).lineLimit(1)
         } icon: {
             Image(systemName: symbol).font(.system(size: 13)).foregroundStyle(Color.accentColor)
         }
             .padding(.vertical, 2)
+            .listRowBackground(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(selected ? Color.primary.opacity(0.12) : .clear)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 1)
+            )
             .contentShape(Rectangle())
             .onTapGesture { workspace.applyView(view) }
             .contextMenu {
@@ -165,7 +172,11 @@ struct SidebarView: View {
     }
 
     private func row(name: String, symbol: String, url: URL, removable: Bool) -> some View {
-        let selected = url.standardizedFileURL.path == model.currentURL.standardizedFileURL.path
+        // A folder row highlights only when no Workspace is the active sidebar
+        // selection — so a folder and a Workspace pointing at the same path never
+        // both light up. Clicking a folder clears the Workspace selection.
+        let selected = workspace.activeViewID == nil
+            && url.standardizedFileURL.path == model.currentURL.standardizedFileURL.path
         return Label {
             Text(name).font(.system(size: 13)).foregroundStyle(.primary).lineLimit(1)
         } icon: {
@@ -181,7 +192,7 @@ struct SidebarView: View {
                     .padding(.vertical, 1)
             )
             .contentShape(Rectangle())
-            .onTapGesture { model.navigate(to: url) }
+            .onTapGesture { workspace.activeViewID = nil; model.navigate(to: url) }
             .contextMenu {
                 Button("Open in New Tab") { workspace.activePaneModel.newTab(at: url) }
                 if removable {

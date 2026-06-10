@@ -15,7 +15,16 @@ struct FileListView: View {
                 HStack(spacing: 8) {
                     IconImage(image: IconProvider.shared.icon(for: item))
                         .frame(width: 16 * model.textScale, height: 16 * model.textScale)
-                    Text(item.name).lineLimit(1).font(.system(size: nameSize))
+                    if model.editingItemID == item.id {
+                        InlineRenameField(
+                            initialName: item.name, isDirectory: item.isDirectory,
+                            fontSize: nameSize,
+                            onCommit: { model.commitRename(item, to: $0) },
+                            onCancel: { model.cancelRename() })
+                            .frame(height: nameSize + 8)
+                    } else {
+                        Text(item.name).lineLimit(1).font(.system(size: nameSize))
+                    }
                     if item.isCloudPlaceholder {
                         Image(systemName: "icloud.and.arrow.down")
                             .font(.system(size: subSize - 1))

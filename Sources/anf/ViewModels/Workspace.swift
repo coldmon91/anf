@@ -405,7 +405,13 @@ final class WorkspaceModel {
         savedViews.add(SavedView(name: trimmed, snapshot: captureSnapshot()))
     }
 
-    func applyView(_ view: SavedView) { applySnapshot(view.snapshot) }
+    /// The saved view currently applied (drives the sidebar selection highlight).
+    var activeViewID: UUID?
+
+    func applyView(_ view: SavedView) {
+        activeViewID = view.id
+        applySnapshot(view.snapshot)
+    }
 
     var activePaneModel: PaneModel { panes[min(activePane, panes.count - 1)] }
     var active: BrowserModel { activePaneModel.current }

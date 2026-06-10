@@ -90,7 +90,10 @@ enum ExternalTools {
 
         let data = outPipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        guard let s = String(data: data, encoding: .utf8) else { return [] }
+        // Lossy UTF-8 decode: tools that emit some binary bytes (e.g. `unzip -p`
+        // over a whole archive) must not nuke the entire output to nil — invalid
+        // bytes become U+FFFD and valid text is preserved.
+        let s = String(decoding: data, as: UTF8.self)
         return s.split(separator: "\n", omittingEmptySubsequences: true)
             .prefix(maxLines).map(String.init)
     }
