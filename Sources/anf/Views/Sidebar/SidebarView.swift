@@ -96,6 +96,10 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
+        // The bare sidebar material is too see-through (washes out over a bright
+        // desktop) — back it with a window-background tint to raise opacity while
+        // keeping a hint of glass.
+        .background(Color(nsColor: .windowBackgroundColor).opacity(0.45))
         .environment(\.defaultMinListRowHeight, 24)
         .task {
             locations = await Task.detached(priority: .utility) { SidebarBuilder.locations() }.value

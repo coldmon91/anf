@@ -37,14 +37,14 @@ enum UISelfTest {
             let winSize = window.contentView?.frame.size ?? .zero
             // NB: `window.contentView` is the controller's *container* NSView —
             // the actual NSSplitView lives on the NSSplitViewController.
-            let splitView = (window.contentViewController as? NSSplitViewController)?.splitView
+            let splitView = window.anfSplitViewController?.splitView
             func contentLeftNow() -> CGFloat {
                 guard let sidebar = splitView?.arrangedSubviews.first else { return 0 }
                 return sidebar.convert(NSPoint(x: sidebar.bounds.maxX, y: 0), to: nil).x + 1
             }
 
             // -- 0. Sidebar: drag the split divider 60pt right → sidebar grows.
-            if let sv = (window.contentViewController as? NSSplitViewController)?.splitView,
+            if let sv = window.anfSplitViewController?.splitView,
                let sidebar = sv.arrangedSubviews.first {
                 let s0 = sidebar.frame.width
                 let probe = NSPoint(x: s0, y: 300)
@@ -152,7 +152,7 @@ enum UISelfTest {
             window.zoom(nil)
             await settle()
 
-            if let split = window.contentViewController as? NSSplitViewController,
+            if let split = window.anfSplitViewController,
                let item = split.splitViewItems.first {
                 item.isCollapsed = true
                 await settle()

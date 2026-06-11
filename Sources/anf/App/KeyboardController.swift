@@ -195,7 +195,7 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
 
     /// ⌘⇧[ toggles the native left sidebar (the split item).
     private func toggleLeftSidebar() {
-        guard let split = NSApp.keyWindow?.contentViewController as? NSSplitViewController,
+        guard let split = NSApp.keyWindow?.anfSplitViewController,
               let item = split.splitViewItems.first else { return }
         item.animator().isCollapsed.toggle()
         workspace.sidebarVisible = !item.isCollapsed
@@ -221,7 +221,7 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
     private func refocusContent() {
         DispatchQueue.main.async {
             guard let window = NSApp.keyWindow,
-                  let split = window.contentViewController as? NSSplitViewController,
+                  let split = window.anfSplitViewController,
                   split.splitViewItems.count > 1 else { return }
             let contentRoot = split.splitViewItems[1].viewController.view
             if let fr = window.firstResponder as? NSView, fr.isDescendant(of: contentRoot) {

@@ -7,6 +7,16 @@ import SwiftUI
 // AppKit directly — create the NSWindow and host the SwiftUI tree in an
 // NSHostingController.
 
+extension NSWindow {
+    /// The main split view controller, whether it's the contentViewController
+    /// itself or wrapped in the root blur container.
+    var anfSplitViewController: NSSplitViewController? {
+        if let split = contentViewController as? NSSplitViewController { return split }
+        return contentViewController?.children
+            .compactMap { $0 as? NSSplitViewController }.first
+    }
+}
+
 final class AppController: NSObject, NSApplicationDelegate {
     static let frameKey = "anf.window.frame.v2"
 
@@ -62,7 +72,27 @@ final class AppController: NSObject, NSApplicationDelegate {
             // desktop (true translucency).
             window.isOpaque = false
             window.backgroundColor = .clear
-            window.contentViewController = split
+            // Root-level blur UNDER the split view: with a clear window, the
+            // sidebar/panels otherwise float over nothing and their square edges
+            // meet the window's rounded corners awkwardly (visible at the bottom-
+            // left). A full-bleed NSVisualEffectView is clipped to the window
+            // shape by the system, so every corner stays Finder-smooth.
+            let container = NSViewController()
+            let base = NSVisualEffectView()
+            base.material = .underWindowBackground
+            base.blendingMode = .behindWindow
+            base.state = .active
+            container.view = base
+            container.addChild(split)
+            split.view.translatesAutoresizingMaskIntoConstraints = false
+            base.addSubview(split.view)
+            NSLayoutConstraint.activate([
+                split.view.leadingAnchor.constraint(equalTo: base.leadingAnchor),
+                split.view.trailingAnchor.constraint(equalTo: base.trailingAnchor),
+                split.view.topAnchor.constraint(equalTo: base.topAnchor),
+                split.view.bottomAnchor.constraint(equalTo: base.bottomAnchor),
+            ])
+            window.contentViewController = container
             // Self-test runs resize everything — keep them out of the autosaved
             // window/sidebar geometry so they can't pollute the user's layout.
             let inSelfTest = ResizeSelfTest.isRequested || UISelfTest.isRequested
