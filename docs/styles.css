@@ -372,3 +372,6 @@ kbd {
   .band-inner, .showcase { padding: 64px 22px; }
   .nav-links a:not(:last-child) { display: none; }
 }
+
+.closing .sub a { color: var(--accent); }
+.closing .sub a:hover { text-decoration: underline; }
