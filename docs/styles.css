@@ -41,6 +41,16 @@ strong { color: var(--txt); font-weight: 600; }
 .nav-links { display: flex; align-items: center; gap: 24px; }
 .nav-links a { color: var(--txt-dim); font-size: 13.5px; transition: color .15s; }
 .nav-links a:hover { color: var(--txt); }
+/* GitHub icon link */
+.nav-gh { display: inline-flex; align-items: center; color: var(--txt-dim); }
+.nav-gh:hover { color: var(--txt); }
+/* Sponsor — gradient pill like the footer button */
+.nav-sponsor {
+  padding: 7px 16px; border-radius: 999px; font-weight: 600; color: #fff !important;
+  background: linear-gradient(90deg, #2997ff, #7c5cff 55%, #ff5ea8);
+  box-shadow: 0 4px 14px rgba(124,92,255,.32); transition: filter .15s;
+}
+.nav-sponsor:hover { filter: brightness(1.08); }
 
 /* ---- Hero ---- */
 .hero {
