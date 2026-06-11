@@ -4,6 +4,7 @@ import Foundation
 // Tools). Run with `swift run anfTests`. Exit code 0 = all passed.
 
 runFuzzyMatchTests()
+runNormalizedRankTests()
 runSFTPParseTests()
 runDocumentTextTests()
 runNormalizationTests()

@@ -376,14 +376,23 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
                 local.append(.init(name: u.lastPathComponent.isEmpty ? u.path : u.lastPathComponent,
                                    url: u, symbol: "clock", isFile: false))
             }
-            for item in workspace.active.items {
-                local.append(.init(name: item.name, url: item.url,
-                                   symbol: item.isBrowsableContainer ? "folder" : "doc",
-                                   isFile: !item.isBrowsableContainer))
-            }
-            let filteredLocal = local.filter {
+            var filteredLocal = local.filter {
                 $0.name.localizedCaseInsensitiveContains(q)
                 || $0.url.path.localizedCaseInsensitiveContains(q)
+            }
+            // Current-folder items: filter inline with a cheap non-localized
+            // compare and stop at the display cap. The old code built a Target for
+            // every item (26k allocations) then ran two locale-aware searches per
+            // item per keystroke on the main thread — a visible typing hitch in
+            // huge folders. The fd/index deep search covers anything missed here.
+            var folderMatches = 0
+            for item in workspace.active.items {
+                if folderMatches >= 60 { break }
+                guard item.name.range(of: q, options: .caseInsensitive) != nil else { continue }
+                folderMatches += 1
+                filteredLocal.append(.init(name: item.name, url: item.url,
+                                           symbol: item.isBrowsableContainer ? "folder" : "doc",
+                                           isFile: !item.isBrowsableContainer))
             }
             // Filename matches first (local + fd/fzf), then a divider, then
             // ripgrep CONTENT matches. deepResults are already matched by the
@@ -517,7 +526,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
 
         // Cheap COW capture on main (no filtering); the prefix filter + fuzzy run
         // off the main thread so typing never hitches.
-        let indexed = FileIndex.shared.entriesIfCovers(root)
+        let pool = FileIndex.shared.poolIfCovers(root)
         let rootPath = root.standardizedFileURL.path
         // 1) Filenames — fuzzy-rank the in-memory index off the main thread.
         // If the index isn't ready, fall back to a per-query fd/mdfind/FileManager.
@@ -528,9 +537,23 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
                         ?? PaletteSearch.mdfindNames(root: root, needle: q, cap: 400)
                         ?? PaletteSearch.fmNames(root: root, needle: q, maxDepth: 6, cap: 400)
                 }
-                if let indexed {
-                    let pool = indexed.filter { FileIndex.isUnder($0.path, rootPath) }
-                    let hits = FuzzyMatch.rank(pool, query: q, limit: 80)
+                if let pool {
+                    // Scope to the focused folder by prefix over the pre-lowered
+                    // paths (no URL.path bridging, no lowercasing per keystroke).
+                    let lowerRoot = FuzzyMatch.normalizeForIndex(rootPath)
+                    let prefix = lowerRoot.hasSuffix("/") ? lowerRoot : lowerRoot + "/"
+                    var urls: [URL] = []
+                    var lower: [String] = []
+                    urls.reserveCapacity(pool.urls.count)
+                    lower.reserveCapacity(pool.urls.count)
+                    for i in pool.urls.indices {
+                        let lp = pool.lower[i]
+                        if lp == lowerRoot || lp.hasPrefix(prefix) {
+                            urls.append(pool.urls[i]); lower.append(lp)
+                        }
+                    }
+                    let hits = FuzzyMatch.rankLowered(urls: urls, lowerPaths: lower,
+                                                      query: q, limit: 80)
                     // The index can be stale or partial (a broad parent scan that
                     // didn't reach this subtree, or capped). If it yields nothing,
                     // fall back to a live fd scan so name search never comes up dry.

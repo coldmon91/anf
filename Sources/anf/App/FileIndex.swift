@@ -13,6 +13,10 @@ final class FileIndex {
 
     private(set) var root: String?
     private(set) var entries: [URL] = []
+    /// Pre-lowercased absolute path per entry (parallel to `entries`). Built once
+    /// off-main at index time so per-keystroke fuzzy ranking never lowercases the
+    /// pool again — that was ~90% of search cost on a 100k+ index.
+    private(set) var lowerPaths: [String] = []
     private(set) var ready = false
 
     private var task: Task<Void, Never>?
@@ -30,18 +34,32 @@ final class FileIndex {
 
         if !seeded {
             seeded = true
-            if let c = Self.loadCache() {
-                root = c.root; entries = c.entries; ready = true
-                startWatching(c.root)
+            // Decode the checkpoint OFF-main: it can hold 300k paths and JSON
+            // decoding that synchronously was a visible hitch on first ⌘K.
+            Task { [weak self] in
+                guard let c = await Task.detached(priority: .userInitiated, operation: {
+                    Self.loadCache()
+                }).value else { return }
+                guard let self, self.root == nil || self.root == c.root else { return }
+                if self.ready { return }   // a live scan finished first
+                self.root = c.root
+                self.entries = c.entries
+                self.lowerPaths = c.lower
+                self.ready = true
+                self.generation &+= 1
+                self.startWatching(c.root)
             }
         }
 
         if let r = root, ready, Self.isUnder(path, r) { return }   // covered; FSEvents keeps it fresh
-        root = path; entries = []; ready = false
+        root = path; entries = []; lowerPaths = []; ready = false; generation &+= 1
         refresh(path, force: true)
     }
 
-    private func reset() { stopWatching(); task?.cancel(); root = nil; ready = false; entries = [] }
+    private func reset() {
+        stopWatching(); task?.cancel()
+        root = nil; ready = false; entries = []; lowerPaths = []; generation &+= 1
+    }
 
     /// Full (re)scan of `rootPath` in the background; replaces entries, re-saves
     /// the checkpoint and (re)starts the FSEvents watcher. Throttled.
@@ -50,13 +68,15 @@ final class FileIndex {
         lastScan[rootPath] = Date()
         task?.cancel()
         task = Task { [weak self] in
-            let urls = await Task.detached(priority: .utility) { () -> [URL] in
+            let scanned = await Task.detached(priority: .utility) { () -> (urls: [URL], lower: [String]) in
                 let u = FileIndex.scan(path: rootPath)
-                FileIndex.saveCache(root: rootPath, entries: u)
+                FileIndex.saveCache(root: rootPath, entries: u.urls)
                 return u
             }.value
             guard let self, self.root == rootPath else { return }
-            self.entries = urls
+            self.entries = scanned.urls
+            self.lowerPaths = scanned.lower
+            self.generation &+= 1
             self.ready = true
             self.startWatching(rootPath)
         }
@@ -124,6 +144,15 @@ final class FileIndex {
         return entries
     }
 
+    /// Search pool (urls + pre-lowercased paths, parallel arrays) if the index
+    /// covers `url`. Cheap COW handoff; the caller filters/ranks off-main.
+    func poolIfCovers(_ url: URL) -> (urls: [URL], lower: [String])? {
+        let path = url.standardizedFileURL.path
+        guard ready, let root, Self.isUnder(path, root),
+              entries.count == lowerPaths.count else { return nil }
+        return (entries, lowerPaths)
+    }
+
     /// Indexed entries scoped to `url` (and below), or nil if not covered/ready.
     func snapshot(for url: URL) -> [URL]? {
         let path = url.standardizedFileURL.path
@@ -132,8 +161,16 @@ final class FileIndex {
         return entries.filter { Self.isUnder($0.path, path) }
     }
 
+    /// Cache for `directories(for:)` — without it every (debounced) keystroke's
+    /// search start re-filters up to 300k entries on the MAIN thread just to feed
+    /// the scan-ticker animation.
+    private var dirsCache: (path: String, generation: Int, dirs: [String])?
+    private var generation = 0   // bumped whenever `entries` is replaced
+
     /// Distinct directory paths under `url` — for the scanning animation.
     func directories(for url: URL, limit: Int = 400) -> [String] {
+        let path = url.standardizedFileURL.path
+        if let c = dirsCache, c.path == path, c.generation == generation { return c.dirs }
         guard let snap = snapshot(for: url) else { return [] }
         var seen = Set<String>()
         var dirs: [String] = []
@@ -141,6 +178,7 @@ final class FileIndex {
             let d = e.deletingLastPathComponent().path
             if seen.insert(d).inserted { dirs.append(d); if dirs.count >= limit { break } }
         }
+        dirsCache = (path, generation, dirs)
         return dirs
     }
 
@@ -148,9 +186,9 @@ final class FileIndex {
         path == root || path.hasPrefix(root.hasSuffix("/") ? root : root + "/")
     }
 
-    nonisolated private static func scan(path: String) -> [URL] {
+    nonisolated private static func scan(path: String) -> (urls: [URL], lower: [String]) {
         let cap = 300_000
-        guard let fd = ExternalTools.path("fd") else { return [] }
+        guard let fd = ExternalTools.path("fd") else { return ([], []) }
         let lines = ExternalTools.run(fd, [
             "--color=never", "--absolute-path", "--type", "f", "--type", "d",
             "--exclude", "Library", "--exclude", ".Trash",
@@ -159,7 +197,7 @@ final class FileIndex {
             "--exclude", "dist", "--exclude", ".venv", "--exclude", "Pods",
             "--max-results", "\(cap)", ".", path
         ], maxLines: cap, timeout: 20.0)
-        return lines.map { URL(fileURLWithPath: $0) }
+        return (lines.map { URL(fileURLWithPath: $0) }, lines.map { FuzzyMatch.normalizeForIndex($0) })
     }
 
     // MARK: - Persistence (checkpoint)
@@ -173,10 +211,10 @@ final class FileIndex {
         return dir.appendingPathComponent("fileindex.json")
     }
 
-    nonisolated static func loadCache() -> (root: String, entries: [URL])? {
+    nonisolated static func loadCache() -> (root: String, entries: [URL], lower: [String])? {
         guard let data = try? Data(contentsOf: cacheURL),
               let c = try? JSONDecoder().decode(Cached.self, from: data) else { return nil }
-        return (c.root, c.paths.map { URL(fileURLWithPath: $0) })
+        return (c.root, c.paths.map { URL(fileURLWithPath: $0) }, c.paths.map { FuzzyMatch.normalizeForIndex($0) })
     }
 
     nonisolated static func saveCache(root: String, entries: [URL]) {

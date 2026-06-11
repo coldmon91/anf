@@ -26,3 +26,30 @@ func runFuzzyMatchTests() {
         T.expect(FuzzyMatch.rank(urls, query: "r", limit: 1).count <= 1, "limit respected")
     }
 }
+
+func runNormalizedRankTests() {
+    T.group("FuzzyMatch.rankLowered (normalized pool)") {
+        // Simulate an index pool whose on-disk paths are NFD (typical for macOS
+        // filesystems) — normalizeForIndex must make NFC queries match them.
+        let rawPaths = [
+            "/x/금융위원회규정.hwpx".decomposedStringWithCanonicalMapping,
+            "/x/report.txt",
+            "/x/unrelated.md",
+        ]
+        let urls = rawPaths.map { URL(fileURLWithPath: $0) }
+        let lower = rawPaths.map { FuzzyMatch.normalizeForIndex($0) }
+
+        let korean = FuzzyMatch.rankLowered(urls: urls, lowerPaths: lower,
+                                            query: "금융위", limit: 10)
+        T.equal(korean.count, 1, "NFC korean query matches NFD path")
+        T.expect(korean.first?.lastPathComponent.contains("규정") == true, "right hit")
+
+        let ascii = FuzzyMatch.rankLowered(urls: urls, lowerPaths: lower,
+                                           query: "REPORT", limit: 10)
+        T.equal(ascii.first?.lastPathComponent, "report.txt", "case-insensitive ascii")
+
+        let none = FuzzyMatch.rankLowered(urls: urls, lowerPaths: lower,
+                                          query: "교육부", limit: 10)
+        T.equal(none.count, 0, "miss stays a miss")
+    }
+}

@@ -83,6 +83,9 @@ struct FileListView: NSViewRepresentable {
             table?.rowHeight = max(20, 18 * model.textScale + 6)
         }
 
+        /// Row identity of the listing we last applied — input for the diff below.
+        private var lastIDs: [FileItem.ID] = []
+
         /// Reconcile the table with the model (called from updateNSView).
         func sync() {
             guard let table else { return }
@@ -90,19 +93,76 @@ struct FileListView: NSViewRepresentable {
                 lastScale = model.textScale
                 applyRowHeight()
                 lastVersion = -1   // force a reload so fonts repaint
+                lastIDs = []
             }
             if lastVersion != model.itemsVersion {
                 lastVersion = model.itemsVersion
-                table.reloadData()
-                applyModelSelection(scroll: false)
+                applyListDiff(to: table)
+                // Items changed → row indices may have shifted; re-map even if the
+                // selection set itself is identical.
+                applyModelSelection(scroll: false, force: true)
             } else {
                 applyModelSelection(scroll: true)
             }
             applyEditing()
         }
 
-        private func applyModelSelection(scroll: Bool) {
+        /// Update rows incrementally instead of `reloadData()`: live changes (a
+        /// file created/renamed/deleted under FSEvents, an iCloud item landing)
+        /// animate just the affected rows and keep scroll position — no full-table
+        /// flash. Navigation (mostly-different listing) still reloads wholesale,
+        /// since a 26k-vs-26k Myers diff with a huge edit distance costs more than
+        /// it saves.
+        private func applyListDiff(to table: NSTableView) {
+            let newIDs = items.map(\.id)
+            defer { lastIDs = newIDs }
+
+            // Same rows in the same order → only the content of some rows changed
+            // (sizes/dates from a reload). Refresh just what's on screen.
+            if newIDs == lastIDs {
+                reloadVisibleRows(table)
+                return
+            }
+            // Mostly-different listing (navigation, first load, sort change) → a
+            // plain reload is cheaper and there's nothing visual to preserve.
+            let commonCount = Set(newIDs).intersection(Set(lastIDs)).count
+            guard !lastIDs.isEmpty, commonCount * 2 > max(newIDs.count, lastIDs.count) else {
+                table.reloadData()
+                return
+            }
+            let diff = newIDs.difference(from: lastIDs)
+            table.beginUpdates()
+            var removals = IndexSet()
+            var insertions = IndexSet()
+            for change in diff {
+                switch change {
+                case .remove(let offset, _, _): removals.insert(offset)
+                case .insert(let offset, _, _): insertions.insert(offset)
+                }
+            }
+            table.removeRows(at: removals, withAnimation: .effectFade)
+            table.insertRows(at: insertions, withAnimation: .effectFade)
+            table.endUpdates()
+            // Rows that stayed put may still carry fresh metadata.
+            reloadVisibleRows(table)
+        }
+
+        private func reloadVisibleRows(_ table: NSTableView) {
+            let visible = table.rows(in: table.visibleRect)
+            guard visible.length > 0 else { return }
+            table.reloadData(
+                forRowIndexes: IndexSet(integersIn: visible.location ..< visible.location + visible.length),
+                columnIndexes: IndexSet(integersIn: 0 ..< table.numberOfColumns))
+        }
+
+        /// Last selection we reconciled, so the O(n) row scan below is skipped on
+        /// the (frequent) updateNSView ticks where the selection didn't change.
+        private var lastAppliedSelection: Set<FileItem.ID>?
+
+        private func applyModelSelection(scroll: Bool, force: Bool = false) {
             guard let table else { return }
+            if !force, lastAppliedSelection == model.selection { return }
+            lastAppliedSelection = model.selection
             let want = IndexSet(items.enumerated()
                 .filter { model.selection.contains($0.element.id) }
                 .map(\.offset))

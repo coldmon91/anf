@@ -25,7 +25,29 @@ enum ExternalTools {
         return dirs.filter { !$0.isEmpty && seen.insert($0).inserted }
     }()
 
+    private static let pathCacheKey = "anf.loginShellPath.v1"
+
+    /// Login-shell PATH directories. Spawning `$SHELL -lc` can take 100–300ms with
+    /// heavy dotfiles, and `searchDirs` is first evaluated on the UI path (first
+    /// ⌘K / first index build) — so the result is cached in UserDefaults: cached
+    /// value is returned instantly and a background refresh updates it for the
+    /// next launch. Only the very first launch ever pays the synchronous cost.
     private static func loginShellPathDirs() -> [String] {
+        if let cached = UserDefaults.standard.stringArray(forKey: pathCacheKey) {
+            DispatchQueue.global(qos: .utility).async {
+                let fresh = queryLoginShellPath()
+                if !fresh.isEmpty, fresh != cached {
+                    UserDefaults.standard.set(fresh, forKey: pathCacheKey)
+                }
+            }
+            return cached
+        }
+        let dirs = queryLoginShellPath()
+        UserDefaults.standard.set(dirs, forKey: pathCacheKey)
+        return dirs
+    }
+
+    private static func queryLoginShellPath() -> [String] {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)

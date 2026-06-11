@@ -39,7 +39,14 @@ final class BrowserModel: Identifiable {
     var sidebarVisible = true
 
     // Selection — changing it marks this tab/pane as the active one.
-    var selection: Set<FileItem.ID> = [] { didSet { onActivity?() } }
+    var selection: Set<FileItem.ID> = [] {
+        didSet { selectedItemsCache = nil; onActivity?() }
+    }
+
+    /// Memoised `selectedItems`. The naive computed property filters the whole
+    /// 26k-item listing on EVERY read, and it's read per keystroke and per render
+    /// (inspector, path bar status, keyboard). Invalidate on selection/items change.
+    @ObservationIgnored private var selectedItemsCache: [FileItem]?
 
     /// Live column count of the icon grid, reported by the view, so ↑/↓ can jump a
     /// whole row instead of stepping one item.
@@ -83,6 +90,7 @@ final class BrowserModel: Identifiable {
         if snapshot.count < 2_000 {
             items = fs.filteredSorted(snapshot, filter: filter, by: order)
             itemsVersion &+= 1
+            selectedItemsCache = nil
             return
         }
         let token = itemsToken
@@ -92,12 +100,16 @@ final class BrowserModel: Identifiable {
                 guard let self, self.itemsToken == token else { return }
                 self.items = computed
                 self.itemsVersion &+= 1
+                self.selectedItemsCache = nil
             }
         }
     }
 
     var selectedItems: [FileItem] {
-        items.filter { selection.contains($0.id) }
+        if let cached = selectedItemsCache { return cached }
+        let computed = selection.isEmpty ? [] : items.filter { selection.contains($0.id) }
+        selectedItemsCache = computed
+        return computed
     }
 
     var canGoBack: Bool { !back.isEmpty }
@@ -310,7 +322,8 @@ final class BrowserModel: Identifiable {
     /// Re-stat a single entry and swap it into the listing (immutably).
     private func refreshItem(at url: URL) {
         guard let fresh = FileItem(url: URL(fileURLWithPath: url.path)) else { return }
-        allItems = allItems.map { $0.url == url ? fresh : $0 }
+        guard let idx = allItems.firstIndex(where: { $0.url == url }) else { return }
+        allItems[idx] = fresh
         recomputeItems()
     }
 

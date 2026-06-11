@@ -26,7 +26,10 @@ struct GalleryView: View {
 
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
+                    // Lazy: a plain HStack realises EVERY item's thumb view up
+                    // front — 26k views (each with a thumbnail task) in a big
+                    // folder. Lazy realises only what's on screen.
+                    LazyHStack(spacing: 10) {
                         ForEach(model.items) { item in
                             GalleryThumb(item: item,
                                          isSelected: focused?.id == item.id)
