@@ -65,7 +65,8 @@ enum FileItemMenu {
         menu.addItem(.separator())
         add(L("Paste", "붙여넣기")) { model.pasteFromPasteboard() }
         add(L("Go to Folder…", "폴더로 이동…")) { model.goToFolderPrompt() }
-        add(L("Copy Path", "경로 복사")) { model.copyPathToPasteboard() }
+        // Empty-space click = the folder itself, not the (auto-)selected row.
+        add(L("Copy Folder Path", "현재 폴더 경로 복사")) { model.copyCurrentFolderPath() }
         menu.addItem(.separator())
         add(model.showHidden ? L("Hide Hidden Files", "숨김 파일 가리기")
                              : L("Show Hidden Files", "숨김 파일 보기")) {

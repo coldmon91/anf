@@ -134,7 +134,11 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
         // --- Command combinations ---
         if cmd {
             if opt {
-                if chars == "c" { model.copyPathToPasteboard(); return true }   // ⌘⌥C copy path
+                // ⌘⌥C copies the selection's path; ⌥⇧⌘C the current folder's.
+                if chars == "c" {
+                    shift ? model.copyCurrentFolderPath() : model.copyPathToPasteboard()
+                    return true
+                }
                 // Tab selection ⌘⌥1…⌘⌥9
                 if let n = Int(chars), (1...9).contains(n) {
                     workspace.activePaneModel.select(n - 1); return true

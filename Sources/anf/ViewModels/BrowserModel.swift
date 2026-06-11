@@ -559,6 +559,14 @@ final class BrowserModel: Identifiable {
         pb.setString(paths.joined(separator: "\n"), forType: .string)
     }
 
+    /// ⌥⇧⌘C — the folder being viewed, regardless of selection (the first row
+    /// is auto-selected, so ⌘⌥C alone can practically never reach it).
+    func copyCurrentFolderPath() {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(currentURL.path, forType: .string)
+    }
+
     func pasteFromPasteboard() {
         let pb = NSPasteboard.general
         guard let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL], !urls.isEmpty else { return }
