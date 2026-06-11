@@ -559,7 +559,9 @@ final class BrowserModel: Identifiable {
         if viewMode == .icons {
             iconSize = min(max(iconSize + Double(direction) * 14, 40), 168)
         } else {
-            textScale = min(max(textScale + Double(direction) * 0.1, 0.8), 2.0)
+            // Finder's list view has exactly two text sizes — ⌘+ goes large,
+            // ⌘− back to normal. No zoom ladder.
+            textScale = direction > 0 ? 1.25 : 1.0
         }
     }
 
