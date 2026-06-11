@@ -237,7 +237,8 @@ h2 {
 }
 /* Copy = a slate icon in the corner of the command box; the whole cell copies. */
 .copy-btn {
-  position: absolute; top: 8px; right: 8px; z-index: 2;
+  position: absolute; top: 50%; right: 8px; z-index: 2;
+  transform: translateY(-50%); /* single-line: vertically centred on the text */
   padding: 7px; border-radius: 8px; border: none; background: transparent;
   color: #8b95a5; /* slate */
   display: inline-flex; align-items: center; justify-content: center;
@@ -245,8 +246,11 @@ h2 {
 }
 .copy-btn svg { display: block; }
 .cmd:hover .copy-btn { color: #c3cbd6; background: rgba(255,255,255,.07); }
-.copy-btn:active { transform: translateY(1px); }
+.copy-btn:active { transform: translateY(calc(-50% + 1px)); }
 .copy-btn.copied { color: #30d158; background: transparent; }
+/* Multi-line command: keep the icon near the top, aligned to the first line. */
+.cmd.multiline .copy-btn { top: 16px; transform: none; }
+.cmd.multiline .copy-btn:active { transform: translateY(1px); }
 
 /* Command box — the whole cell is clickable to copy. */
 .cmd { position: relative; margin-top: 16px; cursor: pointer; }
