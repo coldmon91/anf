@@ -18,8 +18,9 @@ brew install --cask anf
 
 업데이트는 `brew upgrade --cask anf`.
 
-> self-signed 빌드(노터라이즈 안 됨)라 첫 실행 시 Gatekeeper가 막을 수 있습니다 —
-> **anf.app 우클릭 → 열기**, 또는 시스템 설정 > 개인정보 보호 및 보안 > "확인 없이 열기".
+> self-signed 빌드(노터라이즈 안 됨)라 첫 실행 시 Gatekeeper가 막을 수 있습니다.
+> cask가 quarantine를 제거하려 시도하지만, 그래도 막히면:
+> **anf.app 우클릭 → 열기**, 또는 `xattr -dr com.apple.quarantine /Applications/anf.app`.
 
 ### 소스에서 빌드
 
