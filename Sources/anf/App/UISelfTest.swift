@@ -169,6 +169,41 @@ enum UISelfTest {
             edgeProbeCheck("after fullscreen round-trip")
             await sidebarDragCheck("after fullscreen round-trip")
 
+            // -- 5. PgDn/Home/End: synthetic key events through the local monitor
+            // must scroll the icon grid (regression: NSResponder's scrollPage…
+            // defaults only forward up the chain, so page keys were silent no-ops).
+            do {
+                let fm = FileManager.default
+                let dir = fm.temporaryDirectory
+                    .appendingPathComponent("anf-pgscroll-\(ProcessInfo.processInfo.processIdentifier)")
+                try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+                for i in 0..<300 {
+                    fm.createFile(atPath: dir.appendingPathComponent(String(format: "f%03d.txt", i)).path,
+                                  contents: nil)
+                }
+                let model = workspace.active
+                model.navigate(to: dir)
+                model.viewMode = .icons
+                await settle(); await settle()
+                @MainActor func clipY() -> CGFloat {
+                    model.contentScrollView?.contentView.bounds.origin.y ?? -1
+                }
+                check("page-scroll: icon grid registered its scroll view",
+                      model.contentScrollView != nil)
+                let y0 = clipY()
+                key(121, "\u{F72D}", in: window)   // PgDn
+                await settle()
+                check("PgDn scrolls the icon grid (\(Int(y0)) → \(Int(clipY())))", clipY() > y0 + 100)
+                key(119, "\u{F72B}", in: window)   // End
+                await settle()
+                let yEnd = clipY()
+                key(115, "\u{F729}", in: window)   // Home
+                await settle()
+                check("End reaches bottom, Home returns to top (end y=\(Int(yEnd)))",
+                      yEnd > y0 + 100 && clipY() < 1)
+                try? fm.removeItem(at: dir)
+            }
+
             print(failures == 0 ? "UISELFTEST OK" : "UISELFTEST FAILED (\(failures))")
             NSApp.terminate(nil)
         }
@@ -188,6 +223,19 @@ enum UISelfTest {
         }
         post(.leftMouseUp, at: NSPoint(x: from.x + delta.x, y: from.y + delta.y), in: window)
         try? await Task.sleep(nanoseconds: 20_000_000)
+    }
+
+    /// Posts a keyDown through NSApp so the KeyboardController's local event
+    /// monitor handles it exactly like a real keystroke.
+    private static func key(_ code: UInt16, _ chars: String, in window: NSWindow) {
+        guard let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: .function,
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber, context: nil,
+            characters: chars, charactersIgnoringModifiers: chars,
+            isARepeat: false, keyCode: code
+        ) else { return }
+        NSApp.sendEvent(event)
     }
 
     private static func post(_ type: NSEvent.EventType, at point: NSPoint, in window: NSWindow) {
