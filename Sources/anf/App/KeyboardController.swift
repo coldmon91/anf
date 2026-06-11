@@ -82,9 +82,9 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
         // (charactersIgnoringModifiers yields "D"/"G"/"N") and symbol keys.
         let chars = Self.latinLetter[code] ?? (e.charactersIgnoringModifiers ?? "").lowercased()
 
-        // Vertical step: a full grid row in icon/gallery, one item in list/columns.
-        let gridStep = (model.viewMode == .icons || model.viewMode == .gallery)
-            ? max(1, model.gridColumns) : 1
+        // Vertical step: a full grid row in the icon grid; one item in the
+        // gallery filmstrip (a single horizontal row) and in list/columns.
+        let gridStep = model.viewMode == .icons ? max(1, model.gridColumns) : 1
 
         // --- No-modifier keys (orthodox navigation) ---
         if !cmd && !opt {
@@ -114,6 +114,14 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
             case 97:  workspace.transferToOtherPane(move: true); return true   // F6 move
             case 53:  if QLPreviewPanel.sharedPreviewPanelExists() { QLPreviewPanel.shared().orderOut(nil); return true } // esc
             default: break
+            }
+            // Type-to-select (Finder typeahead): plain printable keys jump the
+            // selection to the first item matching the typed prefix. Function
+            // keys land in the U+F700 private-use block; skip those.
+            if !ctrl, let typed = e.characters, !typed.isEmpty,
+               typed.unicodeScalars.allSatisfy({ $0.value > 0x20 && !(0xF700...0xF8FF).contains($0.value) }) {
+                model.typeSelect(typed)
+                return true
             }
         }
 

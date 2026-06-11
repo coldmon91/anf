@@ -86,7 +86,8 @@ final class BrowserModel: Identifiable {
         reload()
     }
 
-    /// Restore this folder's remembered view mode, if any.
+    /// Restore this folder's remembered view mode — its own setting or the
+    /// nearest ancestor's (subfolders follow the parent unless overridden).
     private func applyFolderViewMode() {
         guard let m = ViewModePrefs.shared.mode(for: currentURL), m != viewMode else { return }
         applyingFolderViewMode = true
@@ -196,9 +197,6 @@ final class BrowserModel: Identifiable {
             back.append(currentURL)
             forward.removeAll()
         }
-        // Remember the mode the user was LOOKING at this folder with — not just
-        // explicit changes — so every visited folder restores its own view.
-        ViewModePrefs.shared.set(viewMode, for: currentURL)
         currentURL = url
         if url.scheme != "sftp" {          // local-only bookkeeping
             RecentFolders.shared.record(url)
@@ -245,7 +243,6 @@ final class BrowserModel: Identifiable {
     func goBack() {
         guard let prev = back.popLast() else { return }
         forward.append(currentURL)
-        ViewModePrefs.shared.set(viewMode, for: currentURL)
         currentURL = prev
         applyFolderViewMode()
         reload()
@@ -255,7 +252,6 @@ final class BrowserModel: Identifiable {
     func goForward() {
         guard let next = forward.popLast() else { return }
         back.append(currentURL)
-        ViewModePrefs.shared.set(viewMode, for: currentURL)
         currentURL = next
         applyFolderViewMode()
         reload()
@@ -440,12 +436,16 @@ final class BrowserModel: Identifiable {
     func moveSelection(by delta: Int, extend: Bool = false) {
         let n = items.count
         guard n > 0 else { return }
-        // Current cursor: the tracked one if still in sync with the live selection
-        // (a click/navigation would desync it), else derived from the selection.
-        let current: Int? = {
+        // Current cursor: the tracked one if still in sync with the live selection.
+        // A click or navigation desyncs it — then re-derive from the selection in
+        // listing order (Set iteration order is arbitrary) and drop the stale
+        // anchor, so the next shift+arrow extends from where the user clicked.
+        let tracked: Int? = {
             if let c = selCursor, c < n, selection.contains(items[c].id) { return c }
-            return selection.first.flatMap { id in items.firstIndex { $0.id == id } }
+            return nil
         }()
+        let current = tracked ?? items.firstIndex { selection.contains($0.id) }
+        if tracked == nil { selAnchor = current }
         let cursor = min(max((current ?? (delta >= 0 ? -1 : n)) + delta, 0), n - 1)
 
         if !extend {
@@ -457,21 +457,65 @@ final class BrowserModel: Identifiable {
         let anchor = selAnchor ?? (current ?? cursor)
         selAnchor = anchor
         selCursor = cursor
-        if viewMode == .icons || viewMode == .gallery {
-            // Finder's icon view extends by PATH, not by range: shift+arrow adds
-            // just the cell the cursor moved onto; stepping back over an already
-            // selected cell retracts the one you left.
-            var sel = selection
-            if let prev = current, sel.contains(items[cursor].id), prev != cursor {
-                sel.remove(items[prev].id)
+        if viewMode == .icons {
+            // Icon grid: rectangular block with the anchor and cursor as
+            // opposite corners (spreadsheet-style). Backtracking shrinks it.
+            let cols = max(1, gridColumns)
+            let rows = min(anchor / cols, cursor / cols)...max(anchor / cols, cursor / cols)
+            let band = min(anchor % cols, cursor % cols)...max(anchor % cols, cursor % cols)
+            var sel = Set<FileItem.ID>()
+            for r in rows {
+                for c in band where r * cols + c < n {
+                    sel.insert(items[r * cols + c].id)
+                }
             }
-            sel.insert(items[cursor].id)
             selection = sel
         } else {
-            // List/columns: contiguous reading-order range from anchor to cursor.
+            // List/columns/gallery: contiguous reading-order range.
             let lo = min(anchor, cursor), hi = max(anchor, cursor)
             selection = Set(items[lo...hi].map(\.id))
         }
+    }
+
+    // MARK: Type-to-select (Finder typeahead)
+
+    @ObservationIgnored private var typeahead = ""
+    @ObservationIgnored private var typeaheadDeadline = Date.distantPast
+    /// Per-item search keys, rebuilt only when the listing changes — a keystroke
+    /// must not re-derive 26k jamo expansions.
+    @ObservationIgnored private var typeaheadKeys: [String] = []
+    @ObservationIgnored private var typeaheadKeysVersion = -1
+
+    /// Finder's type-to-select: typing jumps the selection to the first item
+    /// whose name starts with the typed prefix; quick successive keys accumulate
+    /// ("pl" → "playground") and the buffer resets after a short pause. With no
+    /// prefix match the alphabetically nearest follower is selected, like
+    /// Finder. Korean matches by jamo ("ㅍ" finds "플레이그라운드").
+    @discardableResult
+    func typeSelect(_ typed: String, now: Date = Date()) -> Bool {
+        guard !items.isEmpty else { return false }
+        if now > typeaheadDeadline { typeahead = "" }
+        typeahead += typed
+        typeaheadDeadline = now.addingTimeInterval(0.8)
+        if typeaheadKeysVersion != itemsVersion {
+            typeaheadKeysVersion = itemsVersion
+            typeaheadKeys = items.map { HangulJamo.searchKey($0.name) }
+        }
+        let query = HangulJamo.searchKey(typeahead)
+
+        var after: (index: Int, key: String)?
+        var last: (index: Int, key: String)?
+        var target: Int?
+        for (i, key) in typeaheadKeys.enumerated() {
+            if key.hasPrefix(query) { target = i; break }
+            if key > query, after == nil || key < after!.key { after = (i, key) }
+            if last == nil || key > last!.key { last = (i, key) }
+        }
+        guard let hit = target ?? after?.index ?? last?.index else { return false }
+        selection = [items[hit].id]
+        selAnchor = hit
+        selCursor = hit
+        return true
     }
 
     func bumpScale(_ direction: Int) {

@@ -12,6 +12,9 @@ runSortTests()
 runSavedViewTests()
 runFastDirReadTests()
 runSafetyTests()
+runViewModePrefsTests()
+runGridSelectionTests()
+runTypeaheadTests()
 
 print("")
 if T.failures.isEmpty {
