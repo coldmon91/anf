@@ -485,7 +485,18 @@ final class WorkspaceModel {
         // drop the context highlight. (applySnapshot sets `layout` directly, so
         // applying a Workspace doesn't pass through here.)
         activeViewID = nil
+        let oldCount = layout.count
+        let here = active.currentURL
         layout = l
+        // Splitting starts every newly revealed pane at the folder being split
+        // (not whatever stale tabs it held), so 1→4 shows four copies of the
+        // current directory; the user then arranges each pane and saves the
+        // result as a Workspace. Panes that were already visible keep theirs.
+        if l.count > oldCount {
+            for i in oldCount..<min(l.count, panes.count) {
+                panes[i].replaceTabs([BrowserModel(start: here)], activeIndex: 0)
+            }
+        }
         if activePane >= l.count { activePane = 0 }
         save()
     }
