@@ -113,10 +113,18 @@ final class BrowserModel: Identifiable {
         let filter = filterText
         let order = sort
         let fs = self.fs
+        let cacheURL = isRemote ? nil : currentURL
+        let hidden = showHidden
+        func cache(_ computed: [FileItem]) {
+            guard filter.isEmpty, let url = cacheURL else { return }
+            ListingCache.shared.put(url: url, hidden: hidden, sort: order,
+                                    all: snapshot, sorted: computed)
+        }
         if snapshot.count < 2_000 {
             items = fs.filteredSorted(snapshot, filter: filter, by: order)
             itemsVersion &+= 1
             selectedItemsCache = nil
+            cache(items)
             return
         }
         let token = itemsToken
@@ -127,6 +135,7 @@ final class BrowserModel: Identifiable {
                 self.items = computed
                 self.itemsVersion &+= 1
                 self.selectedItemsCache = nil
+                cache(computed)
             }
         }
     }
@@ -305,6 +314,15 @@ final class BrowserModel: Identifiable {
         isLoading = true
         selection.removeAll()
         if isRemote { reloadRemote(token: token); return }
+        // Paint the last known listing instantly (no read, no sort) — the fresh
+        // bulk read below lands ~100ms later and diff-replaces any change.
+        if filterText.isEmpty,
+           let hit = ListingCache.shared.get(url: url, hidden: hidden, sort: sort) {
+            allItems = hit.all
+            items = hit.sorted
+            itemsVersion &+= 1
+            selectedItemsCache = nil
+        }
         Task {
             // Single bulk pass: name + type + size + dates for every entry in a
             // few syscalls, no per-item stat. `contentsFast` already carries the
