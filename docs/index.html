@@ -372,7 +372,12 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
   }
   function next() { go((i + 1) % frames.length); }
   function restart() { clearInterval(timer); timer = setInterval(next, 4500); }
-  dots.forEach(function (d, k) { d.addEventListener('click', function () { go(k); restart(); }); });
+  dots.forEach(function (d, k) {
+    // Hovering a layout button previews that layout above (auto-rotate pauses).
+    d.addEventListener('mouseenter', function () { clearInterval(timer); go(k); });
+    d.addEventListener('mouseleave', function () { restart(); });
+    d.addEventListener('click', function () { go(k); restart(); });
+  });
   restart();
 })();
 
