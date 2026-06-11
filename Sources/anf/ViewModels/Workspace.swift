@@ -154,7 +154,12 @@ final class WorkspaceModel {
 
     // MARK: - Global terminal drawer (one per window, full content width)
 
-    var terminal: TerminalSession?
+    /// Terminal sessions, shown as tabs in the drawer. `terminal` is the active one.
+    private(set) var terminals: [TerminalSession] = []
+    var activeTerminalIndex = 0
+    var terminal: TerminalSession? {
+        terminals.indices.contains(activeTerminalIndex) ? terminals[activeTerminalIndex] : nil
+    }
     var showTerminal = false
     var terminalHeight: CGFloat = 280
     /// True once the user has dragged the divider — stops the auto 1/3-height
@@ -163,7 +168,7 @@ final class WorkspaceModel {
 
     /// Font size for the terminal (⌘+ / ⌘− when the terminal is focused).
     var terminalFontSize: CGFloat = 13 {
-        didSet { terminal?.applyFontSize(terminalFontSize) }
+        didSet { terminals.forEach { $0.applyFontSize(terminalFontSize) } }
     }
 
     /// Clamp the drawer height. When `available` (the content height) is known the
@@ -179,45 +184,62 @@ final class WorkspaceModel {
     }
 
     func openTerminal(at directory: URL) {
-        if terminal == nil {
-            let s = TerminalSession.shell(at: directory)
-            s.applyFontSize(terminalFontSize)
-            terminal = s
+        // Reuse the (single) local-shell tab if one is alive; otherwise add one.
+        if let i = terminals.firstIndex(where: { $0.sshHost == nil && $0.isRunning }) {
+            activeTerminalIndex = i
+        } else {
+            addTerminalTab(.shell(at: directory))
         }
         showTerminal = true
     }
 
     func openSSH(_ host: String) {
-        if let t = terminal, t.sshHost == host, t.isRunning {
-            showTerminal = true; t.focus(); return
-        }
-        let s = TerminalSession.ssh(host)
-        s.applyFontSize(terminalFontSize)
-        setTerminal(s)
+        if focusExistingSSHTab(host) { return }
+        addTerminalTab(.ssh(host))
+        showTerminal = true
     }
 
     func openSSH(_ custom: CustomSSHHost) {
-        if let t = terminal, t.sshHost == custom.target, t.isRunning {
-            showTerminal = true; t.focus(); return
-        }
-        let s = TerminalSession.ssh(custom)
-        s.applyFontSize(terminalFontSize)
-        setTerminal(s)
+        if focusExistingSSHTab(custom.target) { return }
+        addTerminalTab(.ssh(custom))
+        showTerminal = true
     }
 
     /// Open an SFTP session to `host` in the global terminal drawer.
     func openSFTP(_ host: String) {
-        let s = TerminalSession.sftp(host)
-        s.applyFontSize(terminalFontSize)
-        setTerminal(s)
+        addTerminalTab(.sftp(host))
+        showTerminal = true
     }
 
-    /// Swap the drawer's session, killing the previous one's PTY child so we don't
-    /// leave the old ssh/sftp process running when switching hosts.
-    private func setTerminal(_ s: TerminalSession) {
-        terminal?.view.terminate()
-        terminal = s
+    /// Sessions live as tabs: opening another host ADDS a tab (the old PTY keeps
+    /// running in its own tab) instead of replacing the drawer's only session.
+    private func addTerminalTab(_ s: TerminalSession) {
+        s.applyFontSize(terminalFontSize)
+        terminals.append(s)
+        activeTerminalIndex = terminals.count - 1
+    }
+
+    private func focusExistingSSHTab(_ host: String) -> Bool {
+        guard let i = terminals.firstIndex(where: { $0.sshHost == host && $0.isRunning }) else {
+            return false
+        }
+        activeTerminalIndex = i
         showTerminal = true
+        terminals[i].focus()
+        return true
+    }
+
+    /// Close one terminal tab (kills its PTY). Closing the last hides the drawer.
+    func closeTerminal(at index: Int) {
+        guard terminals.indices.contains(index) else { return }
+        terminals[index].view.terminate()
+        terminals.remove(at: index)
+        if terminals.isEmpty {
+            showTerminal = false
+            activeTerminalIndex = 0
+        } else if activeTerminalIndex >= terminals.count {
+            activeTerminalIndex = terminals.count - 1
+        }
     }
 
     /// Browse `host` over SFTP directly in the active pane (no terminal, no

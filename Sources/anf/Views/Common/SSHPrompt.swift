@@ -16,7 +16,7 @@ enum SSHPrompt {
         let fieldWidth: CGFloat = formWidth - fieldX
         let rowHeight: CGFloat = 24
         let rowGap: CGFloat = 8
-        let rows = 4
+        let rows = 3
         let formHeight = CGFloat(rows) * rowHeight + CGFloat(rows - 1) * rowGap
 
         let container = NSView(frame: NSRect(x: 0, y: 0, width: formWidth, height: formHeight))
@@ -40,28 +40,17 @@ enum SSHPrompt {
             return f
         }
 
-        func makeSecureField(row: Int, placeholder: String) -> NSSecureTextField {
-            let y = formHeight - CGFloat(row + 1) * rowHeight - CGFloat(row) * rowGap
-            let f = NSSecureTextField(frame: NSRect(x: fieldX, y: y, width: fieldWidth, height: 22))
-            f.placeholderString = placeholder
-            f.font = .systemFont(ofSize: 13)
-            container.addSubview(f)
-            return f
-        }
-
         makeLabel("Host / IP", row: 0)
         makeLabel("User", row: 1)
-        makeLabel("Password", row: 2)
-        makeLabel("Key File", row: 3)
+        makeLabel("Key File", row: 2)
 
         let hostField = makeField(row: 0, placeholder: L("hostname or IP", "hostname 또는 IP"))
         let userField = makeField(row: 1, placeholder: L("user (optional)", "사용자명 (선택)"))
-        let passField = makeSecureField(row: 2, placeholder: L("password (optional)", "비밀번호 (선택)"))
 
         // Key file row: field + browse "…" button side by side
         let browseWidth: CGFloat = 28
         let keyFieldWidth = fieldWidth - browseWidth - 4
-        let keyRow = 3
+        let keyRow = 2
         let keyY = formHeight - CGFloat(keyRow + 1) * rowHeight - CGFloat(keyRow) * rowGap
         let keyField = NSTextField(frame: NSRect(x: fieldX, y: keyY, width: keyFieldWidth, height: 22))
         keyField.placeholderString = L("~/.ssh/id_rsa (optional)", "~/.ssh/id_rsa (선택)")
@@ -86,14 +75,12 @@ enum SSHPrompt {
         let host = hostField.stringValue.trimmingCharacters(in: .whitespaces)
         guard !host.isEmpty else { return nil }
         let user    = userField.stringValue.trimmingCharacters(in: .whitespaces)
-        let pass    = passField.stringValue.trimmingCharacters(in: .whitespaces)
         let keyPath = keyField.stringValue.trimmingCharacters(in: .whitespaces)
         _ = coordinator
 
         return CustomSSHHost(
             host: host,
             user: user.isEmpty ? nil : user,
-            password: pass.isEmpty ? nil : pass,
             keyFile: keyPath.isEmpty ? nil : keyPath
         )
     }

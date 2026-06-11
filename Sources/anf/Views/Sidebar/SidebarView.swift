@@ -166,6 +166,7 @@ struct SidebarView: View {
             Image(systemName: symbol).font(.system(size: 13)).foregroundStyle(Color.accentColor)
         }
             .padding(.vertical, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .listRowBackground(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(selected ? Color.primary.opacity(0.12) : .clear)
@@ -204,6 +205,7 @@ struct SidebarView: View {
                 .foregroundStyle(Color.accentColor)
         }
             .padding(.vertical, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .listRowBackground(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(selected ? Color.primary.opacity(0.12) : .clear)
@@ -242,7 +244,7 @@ struct SidebarView: View {
     }
 
     private func sshRow(_ host: SSHHost, customData: CustomSSHHost?) -> some View {
-        let session = workspace.terminal?.sshHost == host.alias ? workspace.terminal : nil
+        let session = workspace.terminals.first { $0.sshHost == host.alias }
         let connected = session?.isRunning == true
         let selected = workspace.showTerminal && workspace.terminal?.sshHost == host.alias
         return HStack(spacing: 0) {

@@ -7,19 +7,18 @@ struct SSHHost: Identifiable, Hashable {
     var subtitle: String { hostName ?? alias }
 }
 
-/// A user-added SSH connection with full credentials.
+/// A user-added SSH connection. NOTE: no password field — ssh/sftp here use key
+/// or agent auth, and a password we never use must never sit in UserDefaults.
 struct CustomSSHHost: Codable, Identifiable, Hashable {
     let id: String
     let host: String      // hostname or IP
     let user: String?     // login user (optional — may be in ssh config)
-    let password: String? // stored for reference; direct ssh uses key auth
     let keyFile: String?  // path to private key
 
-    init(host: String, user: String? = nil, password: String? = nil, keyFile: String? = nil) {
+    init(host: String, user: String? = nil, keyFile: String? = nil) {
         self.id = UUID().uuidString
         self.host = host
         self.user = user
-        self.password = password
         self.keyFile = keyFile
     }
 
@@ -51,6 +50,9 @@ final class CustomSSHStore {
         if let data = UserDefaults.standard.data(forKey: key),
            let decoded = try? JSONDecoder().decode([CustomSSHHost].self, from: data) {
             hosts = decoded
+            // Re-persist immediately: builds that had a password field stored it
+            // in plaintext here — rewriting with the current schema scrubs it.
+            persist()
         } else {
             hosts = []
         }

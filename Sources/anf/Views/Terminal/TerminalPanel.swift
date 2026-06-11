@@ -27,19 +27,28 @@ struct TerminalPanel: View {
                     },
                     onEnded: { workspace.save() }
                 )
-                HStack(spacing: 6) {
-                    Image(systemName: "terminal.fill").font(.system(size: 10)).foregroundStyle(.secondary)
-                    Text(session.title).font(.system(size: 11, weight: .medium)).lineLimit(1)
-                    Spacer()
+                // Session tabs: each open shell/ssh/sftp is a tab; × kills that
+                // session's PTY. Hiding the drawer (⌃`) keeps sessions running.
+                HStack(spacing: 4) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 4) {
+                            ForEach(Array(workspace.terminals.enumerated()), id: \.element.id) { i, t in
+                                terminalTab(t, index: i,
+                                            active: i == workspace.activeTerminalIndex)
+                            }
+                        }
+                    }
+                    Spacer(minLength: 6)
                     Button {
                         workspace.showTerminal = false
                     } label: {
-                        Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+                        Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
                             .frame(width: 16, height: 16).contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain).focusEffectDisabled().help("Close Terminal (⌃`)")
+                    .buttonStyle(.plain).focusEffectDisabled()
+                    .help(L("Hide Terminal (⌃`)", "터미널 가리기 (⌃`)"))
                 }
-                .padding(.horizontal, 10).frame(height: 24).background(.bar)
+                .padding(.horizontal, 10).frame(height: 26).background(.bar)
                 // `.id` ties the embedded NSView to the session: when the user
                 // switches host (e.g. ebs → msg10p) SwiftUI tears down the old
                 // terminal view and builds the new session's, instead of keeping
@@ -57,6 +66,40 @@ struct TerminalPanel: View {
                         availableHeight / 3, available: availableHeight)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func terminalTab(_ t: TerminalSession, index: Int, active: Bool) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: t.sshHost == nil ? "terminal.fill" : "network")
+                .font(.system(size: 9))
+                .foregroundStyle(t.isRunning ? (active ? Color.primary : Color.secondary) : Color.red)
+            Text(t.title)
+                .font(.system(size: 11, weight: active ? .semibold : .regular))
+                .lineLimit(1)
+                .foregroundStyle(active ? .primary : .secondary)
+            Button {
+                workspace.closeTerminal(at: index)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 12, height: 12)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(L("Close Session", "세션 닫기"))
+        }
+        .padding(.horizontal, 8).padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(active ? Color.primary.opacity(0.12) : .clear)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            workspace.activeTerminalIndex = index
+            t.focus()
         }
     }
 }
