@@ -247,10 +247,15 @@ final class BrowserModel: Identifiable {
     /// navigation continues immediately (going up otherwise left nothing focused).
     private func selectFirstWhenLoaded() {
         let token = loadToken
+        // Wait for the NEW listing to commit (version bump), not merely for items
+        // to be non-empty — the previous folder's items are still in place while
+        // the load runs, and selecting one of those ids left an invisible
+        // "1 selected" pointing at a row that no longer exists.
+        let versionBefore = itemsVersion
         Task { @MainActor in
             for _ in 0..<20 {   // poll up to ~1s; loads are usually <100ms
                 guard token == loadToken else { return }   // superseded
-                if let first = items.first {
+                if itemsVersion != versionBefore, let first = items.first {
                     if selection.isEmpty { selection = [first.id] }
                     return
                 }
