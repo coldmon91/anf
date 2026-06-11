@@ -11,6 +11,7 @@ runNormalizationTests()
 runSortTests()
 runSavedViewTests()
 runFastDirReadTests()
+runSafetyTests()
 
 print("")
 if T.failures.isEmpty {

@@ -40,7 +40,7 @@ struct SidebarView: View {
                     ForEach(builtins) { row(name: $0.name, symbol: $0.symbol, url: $0.url, removable: false) }
                 }
             } header: {
-                sectionHeader("Favorites", isOpen: $openFavorites)
+                sectionHeader("즐겨찾기", isOpen: $openFavorites)
             }
             if !workspace.favorites.items.isEmpty {
                 Section {
@@ -51,7 +51,7 @@ struct SidebarView: View {
                         }
                     }
                 } header: {
-                    sectionHeader("Pinned", isOpen: $openPinned)
+                    sectionHeader("핀", isOpen: $openPinned)
                 }
             }
             if !workspace.savedViews.views.isEmpty {
@@ -66,10 +66,10 @@ struct SidebarView: View {
             if !locations.isEmpty {
                 Section {
                     if openLocations {
-                        ForEach(locations) { row(name: $0.name, symbol: $0.symbol, url: $0.url, removable: false) }
+                        ForEach(locations) { row(name: $0.name, symbol: $0.symbol, url: $0.url, removable: false, ejectable: $0.ejectable) }
                     }
                 } header: {
-                    sectionHeader("Locations", isOpen: $openLocations)
+                    sectionHeader("위치", isOpen: $openLocations)
                 }
             }
             Section {
@@ -136,6 +136,16 @@ struct SidebarView: View {
         }
     }
 
+    private func eject(_ url: URL, name: String) {
+        do {
+            try NSWorkspace.shared.unmountAndEjectDevice(at: url)
+            locations = SidebarBuilder.locations()
+        } catch {
+            FileOperations.presentFailures("‘\(name)’을(를) 추출하지 못했습니다",
+                                           [error.localizedDescription])
+        }
+    }
+
     private func addSSHHost() {
         guard let custom = SSHPrompt.run() else { return }
         workspace.customSSH.add(custom)
@@ -171,7 +181,12 @@ struct SidebarView: View {
             }
     }
 
-    private func row(name: String, symbol: String, url: URL, removable: Bool) -> some View {
+    private var trashURL: URL? {
+        FileManager.default.urls(for: .trashDirectory, in: .userDomainMask).first
+    }
+
+    private func row(name: String, symbol: String, url: URL, removable: Bool,
+                     ejectable: Bool = false) -> some View {
         // One highlight in the sidebar, always: while a Workspace context is
         // active it owns the highlight, and folder rows stay unlit even when the
         // current folder matches (the path bar shows location anyway).
@@ -202,11 +217,21 @@ struct SidebarView: View {
                 }
             }
             .contextMenu {
-                Button("Open in New Tab") { workspace.activePaneModel.newTab(at: url) }
+                Button("새 탭으로 열기") { workspace.activePaneModel.newTab(at: url) }
                 Button("이 pane에서 열기") { model.navigate(to: url) }
+                if url.path == trashURL?.path {
+                    Divider()
+                    Button("휴지통 비우기…", role: .destructive) {
+                        ArchiveService.emptyTrash { model.reload() }
+                    }
+                }
+                if ejectable {
+                    Divider()
+                    Button("‘\(name)’ 추출") { eject(url, name: name) }
+                }
                 if removable {
                     Divider()
-                    Button("Remove from Sidebar", role: .destructive) { workspace.favorites.remove(url) }
+                    Button("사이드바에서 제거", role: .destructive) { workspace.favorites.remove(url) }
                 }
             }
             .onDrag { NSItemProvider(object: url as NSURL) }
@@ -248,20 +273,20 @@ struct SidebarView: View {
         .contextMenu {
             if let custom = customData {
                 Button("SFTP로 열기") { workspace.openRemote(custom.target) }
-                Button("Connect in anf") { workspace.openSSH(custom) }
+                Button("anf에서 연결") { workspace.openSSH(custom) }
                 Button("SFTP (터미널)") { workspace.openSFTP(custom.target) }
                 Button("SFTP 마운트해서 열기") { workspace.mountSFTP(custom.target) }
-                Button("Connect with Ghostty") { TerminalLauncher.ssh(custom.target) }
+                Button("Ghostty로 연결") { TerminalLauncher.ssh(custom.target) }
                 Divider()
-                Button("Remove from Sidebar", role: .destructive) {
+                Button("사이드바에서 제거", role: .destructive) {
                     workspace.customSSH.remove(target: host.alias)
                 }
             } else {
                 Button("SFTP로 열기") { workspace.openRemote(host.alias) }
-                Button("Connect in anf") { workspace.openSSH(host.alias) }
+                Button("anf에서 연결") { workspace.openSSH(host.alias) }
                 Button("SFTP (터미널)") { workspace.openSFTP(host.alias) }
                 Button("SFTP 마운트해서 열기") { workspace.mountSFTP(host.alias) }
-                Button("Connect with Ghostty") { TerminalLauncher.ssh(host.alias) }
+                Button("Ghostty로 연결") { TerminalLauncher.ssh(host.alias) }
             }
         }
     }

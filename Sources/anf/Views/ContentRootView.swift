@@ -33,6 +33,65 @@ struct ContentRootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: workspace.inspectorVisible)
+        .overlay(alignment: .bottom) { TransferHUD() }
+        .overlay(alignment: .top) { UpdateBanner() }
+        .task { UpdateChecker.shared.checkIfDue() }
+    }
+}
+
+/// Dismissible "new version" pill, shown at most once per release.
+private struct UpdateBanner: View {
+    private var checker: UpdateChecker { UpdateChecker.shared }
+
+    var body: some View {
+        if let v = checker.availableVersion {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles").foregroundStyle(.tint)
+                Text("anf \(v) 출시 — ").font(.system(size: 12))
+                    + Text("brew upgrade --cask anf").font(.system(size: 12, design: .monospaced))
+                Button {
+                    NSWorkspace.shared.open(URL(string: "https://github.com/rescenedev/anf/releases/latest")!)
+                } label: { Text("릴리즈 노트").font(.system(size: 12)) }
+                .buttonStyle(.link)
+                Button {
+                    checker.dismiss()
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+                }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(.regularMaterial, in: Capsule())
+            .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
+            .padding(.top, 10)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+}
+
+/// Floating progress bar for large copies — appears only while FileTransfer is
+/// active; the cancel button stops between items (finished items are kept).
+private struct TransferHUD: View {
+    private var transfer: FileTransfer { FileTransfer.shared }
+
+    var body: some View {
+        if transfer.isActive {
+            HStack(spacing: 12) {
+                ProgressView(value: transfer.fraction)
+                    .progressViewStyle(.linear)
+                    .frame(width: 220)
+                Text(transfer.label)
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Button("취소") { transfer.cancel() }
+                    .controlSize(.small)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 10)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
+            .padding(.bottom, 18)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
     }
 }
 

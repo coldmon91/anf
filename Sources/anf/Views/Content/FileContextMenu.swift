@@ -6,31 +6,44 @@ struct FileContextMenu: View {
     let item: FileItem
 
     var body: some View {
-        Button("Open") { ensureSelected(); model.open(item) }
+        Button("열기") { ensureSelected(); model.open(item) }
 
         if item.isBrowsableContainer {
-            Button("Open Terminal Here") { FileOperations.openInTerminal(item.url) }
+            Button("여기서 터미널 열기") { FileOperations.openInTerminal(item.url) }
         }
 
         Divider()
 
         if model.selection.count > 1 {
-            Button("Rename \(model.selection.count) Items…") { model.batchRename() }
+            Button("\(model.selection.count)개 항목 이름 변경…") { model.batchRename() }
         } else {
-            Button("Rename…") { ensureSelected(); model.renameSelected() }
+            Button("이름 변경") { ensureSelected(); model.beginRename() }
         }
-        Button("Duplicate") { ensureSelected(); model.duplicateSelection() }
+        Button("복제") { ensureSelected(); model.duplicateSelection() }
 
         Divider()
 
-        Button("Copy") { ensureSelected(); model.copySelectionToPasteboard() }
-        Button("Copy Path") { ensureSelected(); model.copyPathToPasteboard() }
-        Button("Paste") { model.pasteFromPasteboard() }
-        Button("Reveal in Finder") { ensureSelected(); model.revealSelection() }
+        if item.ext == "zip" && model.selection.count <= 1 {
+            Button("압축 풀기") {
+                ArchiveService.extract(item) { model.reload() }
+            }
+        } else {
+            Button(model.selection.count > 1 ? "\(model.selection.count)개 항목 압축" : "압축") {
+                ensureSelected()
+                ArchiveService.compress(model.selectedItems) { model.reload() }
+            }
+        }
 
         Divider()
 
-        Button("Move to Trash", role: .destructive) { ensureSelected(); model.trashSelection() }
+        Button("복사") { ensureSelected(); model.copySelectionToPasteboard() }
+        Button("경로 복사") { ensureSelected(); model.copyPathToPasteboard() }
+        Button("붙여넣기") { model.pasteFromPasteboard() }
+        Button("Finder에서 보기") { ensureSelected(); model.revealSelection() }
+
+        Divider()
+
+        Button("휴지통으로 이동", role: .destructive) { ensureSelected(); model.trashSelection() }
     }
 
     private func ensureSelected() {

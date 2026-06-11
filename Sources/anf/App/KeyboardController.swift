@@ -135,6 +135,13 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
                 }
             }
             switch chars {
+            case "z":
+                // ⌘Z undo / ⌘⇧Z redo file operations, then refresh every visible
+                // pane — the change may affect folders shown in other panes.
+                let did = shift ? FileUndo.shared.redo() : FileUndo.shared.undo()
+                if did { workspace.panes.forEach { $0.current.reload() } }
+                else { NSSound.beep() }
+                return true
             case "t": workspace.activePaneModel.newTab(); return true
             case "w":
                 // Close the current tab; if it's the last tab, close the pane.
@@ -159,6 +166,9 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
             default: break
             }
             switch code {
+            case 47:  // ⌘⇧. — toggle hidden files (Finder parity)
+                if shift { model.showHidden.toggle(); return true }
+                return false
             case 123: model.goBack(); refocusContent(); return true     // ⌘← history back
             case 124: model.goForward(); refocusContent(); return true  // ⌘→ history forward
             case 125: model.openSelected(); return true   // ⌘↓ open

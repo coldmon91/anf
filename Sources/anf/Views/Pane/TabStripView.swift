@@ -29,7 +29,7 @@ struct TabStripView: View {
                 }
                 .buttonStyle(.plain)
                 .focusEffectDisabled()
-                .help("New Tab (⌘T)")
+                .help("새 탭 (⌘T)")
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 8)

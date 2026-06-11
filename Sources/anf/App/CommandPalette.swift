@@ -178,7 +178,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         magnifier.translatesAutoresizingMaskIntoConstraints = false
 
         field = NSTextField()
-        field.placeholderString = "Search files & folders…"
+        field.placeholderString = "파일 · 폴더 검색…"
         field.font = .systemFont(ofSize: 18)
         field.isBordered = false
         field.drawsBackground = false

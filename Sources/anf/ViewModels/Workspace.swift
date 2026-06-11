@@ -500,8 +500,6 @@ final class WorkspaceModel {
         let destPane = panes[(activePane + 1) % layout.count]
         let dest = destPane.current
         guard dest.currentURL.path != src.currentURL.path else { NSSound.beep(); return }
-        src.copySelection(into: dest.currentURL, move: move)
-        dest.reload()
-        if move { src.reload() }
+        src.copySelection(into: dest.currentURL, move: move) { dest.reload() }
     }
 }

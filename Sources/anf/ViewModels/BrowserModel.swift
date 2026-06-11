@@ -17,6 +17,9 @@ final class BrowserModel: Identifiable {
     // Contents
     private(set) var allItems: [FileItem] = []
     private(set) var isLoading = false
+    /// The current folder exists but isn't readable (TCC / POSIX permissions) —
+    /// shown instead of a misleading "empty folder".
+    private(set) var accessDenied = false
 
     /// Sorted + filtered listing — what the views render. Cached because for big
     /// directories (tens of thousands of entries) re-sorting on every property
@@ -255,6 +258,8 @@ final class BrowserModel: Identifiable {
             let loaded = await fs.contentsFast(of: url, showHidden: hidden)
             guard token == loadToken else { return }
             allItems = loaded
+            accessDenied = loaded.isEmpty
+                && !FileManager.default.isReadableFile(atPath: url.path)
             recomputeItems()
             isLoading = false
         }
@@ -461,22 +466,23 @@ final class BrowserModel: Identifiable {
         guard let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL], !urls.isEmpty else { return }
         // A paste of ⌘X-marked items is a move (Finder semantics); the cut mark
         // clears after one paste so repeat-pastes copy.
-        if Set(urls.map(\.path)) == Self.cutPaths {
-            Self.cutPaths = []
-            FileOperations.move(urls, into: currentURL)
-        } else {
-            FileOperations.copy(urls, into: currentURL)
+        let isCut = Set(urls.map(\.path)) == Self.cutPaths
+        if isCut { Self.cutPaths = [] }
+        FileTransfer.shared.transfer(urls, into: currentURL, move: isCut) { [weak self] in
+            self?.reload()
         }
-        reload()
     }
 
     /// Copy the current selection into another directory (used by Mdir-style
-    /// pane-to-pane transfers).
-    func copySelection(into destination: URL, move: Bool) {
+    /// pane-to-pane transfers). `onDone` runs after the (async) transfer lands —
+    /// the destination pane reloads there, not before.
+    func copySelection(into destination: URL, move: Bool, onDone: @escaping () -> Void = {}) {
         let urls = selectedItems.map(\.url)
         guard !urls.isEmpty, destination != currentURL else { return }
-        if move { FileOperations.move(urls, into: destination) }
-        else { FileOperations.copy(urls, into: destination) }
+        FileTransfer.shared.transfer(urls, into: destination, move: move) { [weak self] in
+            self?.reload()
+            onDone()
+        }
     }
 
     func openTerminalHere() {
@@ -510,8 +516,8 @@ final class BrowserModel: Identifiable {
     /// Legacy modal rename (kept for menu use).
     func renameSelected() {
         guard let item = selectedItems.first else { return }
-        guard let newName = TextPrompt.run(title: "Rename", message: "New name for “\(item.name)”",
-                                           defaultValue: item.name, action: "Rename") else { return }
+        guard let newName = TextPrompt.run(title: "이름 변경", message: "‘\(item.name)’의 새 이름:",
+                                           defaultValue: item.name, action: "변경") else { return }
         if let dest = FileOperations.rename(item, to: newName) {
             reload(); selection = [dest]
         }
@@ -522,9 +528,9 @@ final class BrowserModel: Identifiable {
     func acceptDrop(_ urls: [URL], into destination: URL, copy: Bool) {
         let incoming = urls.filter { $0.deletingLastPathComponent().path != destination.path }
         guard !incoming.isEmpty else { return }
-        if copy { FileOperations.copy(incoming, into: destination) }
-        else { FileOperations.move(incoming, into: destination) }
-        reload()
+        FileTransfer.shared.transfer(incoming, into: destination, move: !copy) { [weak self] in
+            self?.reload()
+        }
     }
 
     /// Batch rename the selection by find/replace on each name.
@@ -532,9 +538,9 @@ final class BrowserModel: Identifiable {
         let targets = selectedItems
         guard targets.count > 1 else { renameSelected(); return }
         guard let (find, replace) = TextPrompt.runPair(
-            title: "Rename \(targets.count) Items",
-            message: "Replace text in each name:",
-            label1: "Find", label2: "Replace with", action: "Rename"),
+            title: "\(targets.count)개 항목 이름 변경",
+            message: "각 이름에서 찾아 바꿀 텍스트:",
+            label1: "찾기", label2: "바꾸기", action: "변경"),
               !find.isEmpty else { return }
         for item in targets {
             let newName = item.name.replacingOccurrences(of: find, with: replace)
@@ -544,9 +550,9 @@ final class BrowserModel: Identifiable {
     }
 
     func goToFolderPrompt() {
-        guard let raw = TextPrompt.run(title: "Go to Folder",
-                                       message: "Enter or paste a path:",
-                                       defaultValue: currentURL.path, action: "Go") else { return }
+        guard let raw = TextPrompt.run(title: "폴더로 이동",
+                                       message: "경로를 입력하거나 붙여넣기:",
+                                       defaultValue: currentURL.path, action: "이동") else { return }
         let expanded = (raw as NSString).expandingTildeInPath
         var isDir: ObjCBool = false
         if FileManager.default.fileExists(atPath: expanded, isDirectory: &isDir), isDir.boolValue {

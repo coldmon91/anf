@@ -33,7 +33,18 @@ struct ContentArea: View {
             } else if let err = model.remoteError, model.items.isEmpty {
                 RemoteErrorState(message: err) { model.reload() }
             } else if !model.isLoading && model.items.isEmpty {
-                EmptyState(filtered: !model.filterText.isEmpty)
+                if model.accessDenied {
+                    VStack(spacing: 10) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 44)).foregroundStyle(.tertiary)
+                        Text("이 폴더를 읽을 권한이 없습니다")
+                            .font(.title3).foregroundStyle(.secondary)
+                        Text("시스템 설정 > 개인정보 보호 및 보안에서 anf의 접근을 허용해 보세요.")
+                            .font(.system(size: 12)).foregroundStyle(.tertiary)
+                    }
+                } else {
+                    EmptyState(filtered: !model.filterText.isEmpty)
+                }
             }
         }
         // Drop files anywhere in the pane → move them into this folder (enables
@@ -55,14 +66,14 @@ struct ContentArea: View {
 private struct BackgroundMenu: View {
     @Bindable var model: BrowserModel
     var body: some View {
-        Button("New Folder") { model.makeNewFolder() }
-        Button("Open Terminal Here") { FileOperations.openInTerminal(model.currentURL) }
+        Button("새 폴더") { model.makeNewFolder() }
+        Button("여기서 터미널 열기") { FileOperations.openInTerminal(model.currentURL) }
         Divider()
-        Button("Paste") { model.pasteFromPasteboard() }
-        Button("Go to Folder…") { model.goToFolderPrompt() }
-        Button("Copy Path") { model.copyPathToPasteboard() }
+        Button("붙여넣기") { model.pasteFromPasteboard() }
+        Button("폴더로 이동…") { model.goToFolderPrompt() }
+        Button("경로 복사") { model.copyPathToPasteboard() }
         Divider()
-        Toggle("Show Hidden Files", isOn: Binding(get: { model.showHidden }, set: { model.showHidden = $0 }))
+        Toggle("숨김 파일 보기", isOn: Binding(get: { model.showHidden }, set: { model.showHidden = $0 }))
     }
 }
 
@@ -89,7 +100,7 @@ private struct EmptyState: View {
         VStack(spacing: 10) {
             Image(systemName: filtered ? "magnifyingglass" : "folder")
                 .font(.system(size: 44)).foregroundStyle(.tertiary)
-            Text(filtered ? "No matches" : "Empty Folder")
+            Text(filtered ? "일치하는 항목 없음" : "빈 폴더")
                 .font(.title3).foregroundStyle(.secondary)
         }
     }

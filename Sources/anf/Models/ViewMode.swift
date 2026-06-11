@@ -15,10 +15,10 @@ enum ViewMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .icons:   return "Icons"
-        case .list:    return "List"
-        case .columns: return "Columns"
-        case .gallery: return "Gallery"
+        case .icons:   return "아이콘"
+        case .list:    return "리스트"
+        case .columns: return "컬럼"
+        case .gallery: return "갤러리"
         }
     }
 }
@@ -28,10 +28,10 @@ enum SortKey: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .name: return "Name"
-        case .dateModified: return "Date Modified"
-        case .size: return "Size"
-        case .kind: return "Kind"
+        case .name: return "이름"
+        case .dateModified: return "수정일"
+        case .size: return "크기"
+        case .kind: return "종류"
         }
     }
 }

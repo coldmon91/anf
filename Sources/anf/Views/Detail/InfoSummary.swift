@@ -10,15 +10,15 @@ struct InfoSummary: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(item.name).font(.headline).lineLimit(2)
-            row("Kind", Format.kind(item))
+            row("종류", Format.kind(item))
             if item.isBrowsableContainer {
                 folderSizeRow
             } else {
-                row("Size", Format.bytes(item.size))
+                row("크기", Format.bytes(item.size))
             }
-            row("Modified", Format.when(item.modified))
-            row("Created", Format.when(item.created))
-            row("Where", item.url.deletingLastPathComponent().path)
+            row("수정일", Format.when(item.modified))
+            row("생성일", Format.when(item.created))
+            row("위치", item.url.deletingLastPathComponent().path)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .id(item.id)
@@ -26,13 +26,13 @@ struct InfoSummary: View {
 
     @ViewBuilder private var folderSizeRow: some View {
         HStack(alignment: .top, spacing: 8) {
-            Text("Size").foregroundStyle(.secondary).frame(width: 64, alignment: .trailing)
+            Text("크기").foregroundStyle(.secondary).frame(width: 64, alignment: .trailing)
             if let folderSize {
                 Text(Format.bytes(folderSize)).textSelection(.enabled)
             } else if calculating {
                 ProgressView().controlSize(.small)
             } else {
-                Button("Calculate") {
+                Button("계산") {
                     calculating = true
                     Task {
                         let size = await fs.directorySize(of: item.url)
@@ -108,7 +108,7 @@ struct InfoInspector: View {
                 if target.isCloudPlaceholder {
                     HStack(spacing: 6) {
                         ProgressView().controlSize(.small)
-                        Text("Downloading from iCloud…")
+                        Text("iCloud에서 다운로드 중…")
                             .font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 6)
@@ -123,7 +123,7 @@ struct InfoInspector: View {
                 Spacer()
                 VStack(spacing: 8) {
                     Image(systemName: "sidebar.right").font(.largeTitle).foregroundStyle(.tertiary)
-                    Text("Select an item").foregroundStyle(.secondary)
+                    Text("항목을 선택하세요").foregroundStyle(.secondary)
                 }
                 Spacer()
             }
@@ -143,7 +143,7 @@ struct InfoInspector: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.bottom, 10)
-                .help(showDetails ? "Hide Info" : "Show Info")
+                .help(showDetails ? "정보 가리기" : "정보 보기")
             }
         }
         .onChange(of: target?.id, initial: true) {

@@ -17,7 +17,7 @@ struct GalleryView: View {
                     QuickLookView(url: focused.url)
                         .padding(24)
                 } else {
-                    ContentUnavailableLabel("No items", symbol: "photo.on.rectangle")
+                    ContentUnavailableLabel("항목 없음", symbol: "photo.on.rectangle")
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

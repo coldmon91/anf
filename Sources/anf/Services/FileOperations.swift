@@ -1,6 +1,8 @@
 import AppKit
 
 /// Thin wrappers over Finder-style file actions. All user-facing, all on the main actor.
+/// Mutating operations record themselves with `FileUndo` so ⌘Z can revert them,
+/// and surface failures in one alert — errors are never silent.
 @MainActor
 enum FileOperations {
 
@@ -16,36 +18,38 @@ enum FileOperations {
         TerminalLauncher.openHere(url)
     }
 
-    /// Move to Trash. Returns the URLs that were trashed (for undo feedback).
+    /// Move to Trash. Returns (original, trashed-location) pairs — the trashed
+    /// URL is what undo needs to put the file back.
     @discardableResult
-    static func moveToTrash(_ items: [FileItem]) -> [URL] {
-        var trashed: [URL] = []
+    static func moveToTrash(_ items: [FileItem]) -> [(original: URL, trashed: URL)] {
+        var pairs: [(original: URL, trashed: URL)] = []
+        var failures: [String] = []
         for item in items {
             do {
-                try FileManager.default.trashItem(at: item.url, resultingItemURL: nil)
-                trashed.append(item.url)
+                var trashedURL: NSURL?
+                try FileManager.default.trashItem(at: item.url, resultingItemURL: &trashedURL)
+                if let t = trashedURL as URL? { pairs.append((item.url, t)) }
             } catch {
-                NSSound.beep()
+                failures.append("\(item.name): \(error.localizedDescription)")
             }
         }
-        return trashed
+        if !pairs.isEmpty {
+            FileUndo.shared.record(.trash(pairs))
+        }
+        presentFailures("휴지통으로 이동하지 못했습니다", failures)
+        return pairs
     }
 
     /// Create a new uniquely-named folder inside `parent`. Returns its URL.
     @discardableResult
     static func newFolder(in parent: URL, baseName: String = "untitled folder") -> URL? {
-        let fm = FileManager.default
-        var url = parent.appendingPathComponent(baseName)
-        var n = 2
-        while fm.fileExists(atPath: url.path) {
-            url = parent.appendingPathComponent("\(baseName) \(n)")
-            n += 1
-        }
+        let url = uniqueURL(for: baseName, in: parent)
         do {
-            try fm.createDirectory(at: url, withIntermediateDirectories: false)
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+            FileUndo.shared.record(.created([url]))
             return url
         } catch {
-            NSSound.beep()
+            presentFailures("폴더를 만들지 못했습니다", [error.localizedDescription])
             return nil
         }
     }
@@ -57,30 +61,43 @@ enum FileOperations {
         let dest = item.url.deletingLastPathComponent().appendingPathComponent(trimmed)
         do {
             try FileManager.default.moveItem(at: item.url, to: dest)
+            FileUndo.shared.record(.move([(from: item.url, to: dest)]))
             return dest
         } catch {
-            NSSound.beep()
+            presentFailures("이름을 바꾸지 못했습니다", ["\(item.name): \(error.localizedDescription)"])
             return nil
         }
     }
 
-    /// Copy source URLs into `destination`, auto-renaming on collision.
-    static func copy(_ urls: [URL], into destination: URL) {
-        for src in urls {
-            let dest = uniqueURL(for: src.lastPathComponent, in: destination)
-            do { try FileManager.default.copyItem(at: src, to: dest) } catch { NSSound.beep() }
+    static func duplicate(_ items: [FileItem]) {
+        let fm = FileManager.default
+        var created: [URL] = []
+        var failures: [String] = []
+        for item in items {
+            let dir = item.url.deletingLastPathComponent()
+            let base = item.url.deletingPathExtension().lastPathComponent
+            let ext = item.url.pathExtension
+            var dest = dir.appendingPathComponent("\(base) copy")
+                .appendingPathExtension(ext.isEmpty ? "" : ext)
+            var n = 2
+            while fm.fileExists(atPath: dest.path) {
+                dest = dir.appendingPathComponent("\(base) copy \(n)")
+                    .appendingPathExtension(ext.isEmpty ? "" : ext)
+                n += 1
+            }
+            do {
+                try fm.copyItem(at: item.url, to: dest)
+                created.append(dest)
+            } catch {
+                failures.append("\(item.name): \(error.localizedDescription)")
+            }
         }
+        if !created.isEmpty { FileUndo.shared.record(.created(created)) }
+        presentFailures("복제하지 못했습니다", failures)
     }
 
-    /// Move source URLs into `destination`, auto-renaming on collision.
-    static func move(_ urls: [URL], into destination: URL) {
-        for src in urls {
-            let dest = uniqueURL(for: src.lastPathComponent, in: destination)
-            do { try FileManager.default.moveItem(at: src, to: dest) } catch { NSSound.beep() }
-        }
-    }
-
-    private static func uniqueURL(for name: String, in dir: URL) -> URL {
+    /// Next available "name", "name 2", "name 3"… in `dir`.
+    static func uniqueURL(for name: String, in dir: URL) -> URL {
         let fm = FileManager.default
         let base = (name as NSString).deletingPathExtension
         let ext = (name as NSString).pathExtension
@@ -94,21 +111,20 @@ enum FileOperations {
         return url
     }
 
-    static func duplicate(_ items: [FileItem]) {
-        let fm = FileManager.default
-        for item in items {
-            let dir = item.url.deletingLastPathComponent()
-            let base = item.url.deletingPathExtension().lastPathComponent
-            let ext = item.url.pathExtension
-            var dest = dir.appendingPathComponent("\(base) copy")
-                .appendingPathExtension(ext.isEmpty ? "" : ext)
-            var n = 2
-            while fm.fileExists(atPath: dest.path) {
-                dest = dir.appendingPathComponent("\(base) copy \(n)")
-                    .appendingPathExtension(ext.isEmpty ? "" : ext)
-                n += 1
-            }
-            try? fm.copyItem(at: item.url, to: dest)
+    /// One alert for a batch of failures — errors must never be silent.
+    static func presentFailures(_ title: String, _ failures: [String]) {
+        guard !failures.isEmpty else { return }
+        // Headless (unit tests, self-tests): a modal alert would hang — log instead.
+        guard NSApplication.shared.isRunning else {
+            NSLog("[anf] %@: %@", title, failures.joined(separator: "; "))
+            return
         }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = title
+        alert.informativeText = failures.prefix(5).joined(separator: "\n")
+            + (failures.count > 5 ? "\n외 \(failures.count - 5)건" : "")
+        alert.addButton(withTitle: "확인")
+        alert.runModal()
     }
 }
