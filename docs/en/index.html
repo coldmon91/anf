@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>anf — all new finder</title>
+<meta name="description" content="A fast, lightweight native file browser for macOS. Split panes, built-in terminal, command palette.">
+<link rel="alternate" hreflang="ko" href="https://rescenedev.github.io/anf/">
+<link rel="alternate" hreflang="en" href="https://rescenedev.github.io/anf/en/">
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">anf</a>
+    <nav class="nav-links">
+      <a href="#install">Install</a>
+      <a href="#features">Features</a>
+      <a href="#performance">Why It's Fast</a>
+      <a href="#terminal">Terminal</a>
+      <a href="#palette">Palette</a>
+      <a href="#shortcuts">Shortcuts</a>
+      <a href="#tools">Tools</a>
+      <a href="#opensource">Open Source</a>
+      <a href="#release">Release Notes</a>
+      <a href="../">한국어</a>
+      <a class="nav-gh" href="https://github.com/rescenedev/anf" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.34-5.47-5.95 0-1.32.47-2.39 1.24-3.23-.13-.3-.54-1.53.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.65.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.23 0 4.62-2.81 5.64-5.49 5.94.43.37.81 1.1.81 2.22 0 1.61-.01 2.9-.01 3.29 0 .32.21.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg></a>
+      <a class="nav-sponsor" href="https://fairy.hada.io/@lumen" target="_blank" rel="noopener">Sponsor</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- Hero -->
+  <section class="hero">
+    <p class="eyebrow">all new finder</p>
+    <h1>Your Finder, reimagined.</h1>
+    <p class="lead">Split panes, a built-in terminal, a command palette.<br>A fast, lightweight native file browser for macOS.</p>
+    <div class="carousel">
+      <div class="car-frames">
+        <figure class="car-frame active"><img src="../assets/layout-single.png" alt="Single pane layout" loading="eager"></figure>
+        <figure class="car-frame"><img src="../assets/layout-dual.png" alt="Two panes side by side" loading="lazy"></figure>
+        <figure class="car-frame"><img src="../assets/layout-rows.png" alt="Two rows" loading="lazy"></figure>
+        <figure class="car-frame"><img src="../assets/layout-quad.png" alt="Four panes" loading="lazy"></figure>
+      </div>
+      <div class="dots">
+        <button class="dot active" type="button"><span class="k">A</span> Single</button>
+        <button class="dot" type="button"><span class="k">B</span> Two Panes</button>
+        <button class="dot" type="button"><span class="k">C</span> Two Rows</button>
+        <button class="dot" type="button"><span class="k">D</span> Four Panes</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install" class="band">
+    <div class="band-inner">
+      <h2 class="centered">Install.</h2>
+      <p class="sub centered">One Homebrew command. Apple Silicon recommended.</p>
+      <div class="install-box">
+        <div class="cmd multiline"><code id="cmd-brew">brew tap rescenedev/anf
+brew trust rescenedev/anf
+brew install --cask anf</code><button class="copy-btn" type="button" data-target="cmd-brew" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+        <p class="note">Update with <code>brew upgrade --cask anf</code>. This is a self-signed build, so if Gatekeeper blocks the first launch,
+          <strong>right-click anf.app → Open</strong>, or strip the quarantine flag:</p>
+        <div class="cmd"><code>xattr -dr com.apple.quarantine /Applications/anf.app</code><button class="copy-btn" type="button" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+        <p class="note">Optional — install <code>fd</code> and <code>ripgrep</code> for faster name/content search (falls back to Spotlight without them):</p>
+        <div class="cmd"><code>brew install fd ripgrep</code><button class="copy-btn" type="button" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+        <p class="note">Optional — full rich HWP/HWPX previews (alhangeul). anf extracts the body text on its own even without it:</p>
+        <div class="cmd"><code>brew install --cask postmelee/tap/alhangeul</code><button class="copy-btn" type="button" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="band">
+    <div class="band-inner">
+      <h2 class="centered">Everything in one window.</h2>
+      <p class="sub centered">The tools you need for working with files, brought together naturally.</p>
+      <div class="grid">
+        <div class="tile">
+          <div class="ic">▦</div>
+          <h3>Flexible split panes</h3>
+          <p>Single · two panes · two rows · four panes. Drag the dividers to resize; window position, layout and view modes are all remembered.</p>
+        </div>
+        <div class="tile">
+          <div class="ic">⌘K</div>
+          <h3>Command palette</h3>
+          <p>⌘K from anywhere. Instant name search under the focused folder via fd, content search via ripgrep — and jump straight to pins, recents and favorites.</p>
+        </div>
+        <div class="tile">
+          <div class="ic">❯_</div>
+          <h3>Built-in terminal</h3>
+          <p>A global drawer at the bottom of the window, running on a real PTY. Resize the font with ⌘±, connect to SSH hosts in one click.</p>
+        </div>
+        <div class="tile">
+          <div class="ic">☁</div>
+          <h3>iCloud aware</h3>
+          <p>Undownloaded placeholders get a cloud badge, and selecting one in the inspector downloads it automatically.</p>
+        </div>
+        <div class="tile">
+          <div class="ic">◧</div>
+          <h3>Inspector previews</h3>
+          <p>QuickLook previews plus a readable text viewer. Bump the font size of text files with ⌘±.</p>
+        </div>
+        <div class="tile">
+          <div class="ic">⤢</div>
+          <h3>Native sidebar</h3>
+          <p>Favorites · pins · locations · SSH sections. Collapsible groups, automatic ~/.ssh/config parsing, live session indicators.</p>
+        </div>
+        <div class="tile">
+          <div class="ic">한</div>
+          <h3>hwpx body text too</h3>
+          <p>Extracts the body text of Korean hwpx as well as docx/pptx/xlsx — searchable from ⌘K and previewed in the inspector. No extra software.</p>
+        </div>
+        <div class="tile">
+          <div class="ic">▣</div>
+          <h3>Workspaces</h3>
+          <p>Save the current split layout and tabs under a name, then jump back to that whole working arrangement from the sidebar.</p>
+        </div>
+        <div class="tile">
+          <div class="ic">⇆</div>
+          <h3>GUI SFTP</h3>
+          <p>Browse SSH hosts like regular folders. No terminal, no sshfs, no macFUSE — remote directories right in the window.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Why fast -->
+  <section id="performance" class="showcase">
+    <h2 class="centered">Why it's fast.</h2>
+    <p class="sub centered">Speed is a design decision, not an accident.</p>
+    <div class="grid">
+      <div class="tile">
+        <div class="ic">⚡</div>
+        <h3>Native, no Electron</h3>
+        <p>Swift + AppKit talking straight to the system frameworks. No browser runtime — fast startup, light memory.</p>
+      </div>
+      <div class="tile">
+        <div class="ic">⌖</div>
+        <h3>fd · ripgrep in the background</h3>
+        <p>Names are indexed in the background with <code>fd</code> (filtered in memory), content searched with <code>ripgrep</code> — no disk crawl per keystroke, and the index checkpoints to disk so it's warm after a restart.</p>
+      </div>
+      <div class="tile">
+        <div class="ic">≈</div>
+        <h3>Built-in fuzzy matching</h3>
+        <p>Fuzzy ranking implemented directly in Swift — no external fzf process. It runs off the main thread, so typing never stutters.</p>
+      </div>
+      <div class="tile">
+        <div class="ic">◧</div>
+        <h3>AppKit controllers, not SwiftUI</h3>
+        <p>The command palette drives <code>NSPanel</code> + <code>NSTableView</code> directly. Keyboard focus and performance problems SwiftUI couldn't solve are handled natively.</p>
+      </div>
+      <div class="tile">
+        <div class="ic">▤</div>
+        <h3>Any folder, in a blink</h3>
+        <p>Folder entry uses the native <code>getattrlistbulk(2)</code> bulk read — names, kinds, sizes and dates in a few syscalls, no per-item <code>stat</code>. Typical folders open in 0.01s; even 26,000 entries take ~0.1s.</p>
+      </div>
+      <div class="tile">
+        <div class="ic">▦</div>
+        <h3>Native NSTableView rendering</h3>
+        <p>The file list is drawn by <code>NSTableView</code>, not SwiftUI. Only visible rows are recycled, so scrolling, sorting and arrow keys stay instant at tens of thousands of items.</p>
+      </div>
+      <div class="tile">
+        <div class="ic">⏱</div>
+        <h3>Debounce · timeouts</h3>
+        <p>Search debounces at 130ms to avoid wasted work, and content search (ripgrep) has a 3s timeout and skips huge files — it never hangs.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Terminal -->
+  <section id="terminal" class="showcase">
+    <h2 class="centered">A terminal that never leaves the window.</h2>
+    <p class="sub centered">A built-in terminal in a global bottom drawer — xterm.js rendering wired to a real PTY.</p>
+    <div class="shot wide"><img src="../assets/terminal.png" alt="anf built-in terminal" loading="lazy"></div>
+    <ul class="ticks centered-list">
+      <li>Opens at about a third of the window — drag to resize</li>
+      <li>⌃` to toggle · ⌘+ / ⌘− for font size</li>
+      <li>Click an SSH host in the sidebar to connect, with live session indicators</li>
+    </ul>
+  </section>
+
+  <!-- Palette -->
+  <section id="palette" class="band">
+    <div class="band-inner">
+      <h2 class="centered">⌘K — results as you type.</h2>
+      <p class="sub centered">A pure-AppKit command palette. Hit ⌘K anywhere and results pour in the moment you start typing.</p>
+      <div class="duo quad">
+        <figure class="duo-item">
+          <img src="../assets/palette.png" alt="Palette — pins, recents, favorites" loading="lazy">
+          <figcaption>Pins · recents · favorites</figcaption>
+        </figure>
+        <figure class="duo-item">
+          <img src="../assets/palette-scan.png" alt="Palette — directory scan" loading="lazy">
+          <figcaption>Typing — live directory scan</figcaption>
+        </figure>
+        <figure class="duo-item">
+          <img src="../assets/palette-search.png" alt="Palette — instant search" loading="lazy">
+          <figcaption>Results pour in — instant search</figcaption>
+        </figure>
+        <figure class="duo-item">
+          <img src="../assets/palette-hwpx.png" alt="Palette — hwpx content search" loading="lazy">
+          <figcaption>hwpx body text, searched instantly</figcaption>
+        </figure>
+      </div>
+      <ul class="ticks centered-list">
+        <li>Empty state: pins → recent folders → favorites</li>
+        <li>Names search the focused folder's subtree instantly via fd (built-in fuzzy ranking)</li>
+        <li>Content matches shown separately via ripgrep — including hwpx/docx body text</li>
+        <li>Folders navigate; files jump to their location and select</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Shortcuts -->
+  <section id="shortcuts" class="showcase">
+    <h2 class="centered">Hands on the keyboard.</h2>
+    <p class="sub centered">Every frequent action has a shortcut.</p>
+    <div class="keys">
+      <div class="key-row"><span class="ks"><kbd>⌘K</kbd></span><span class="kd">Command palette (search)</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘1</kbd><kbd>⌘2</kbd><kbd>⌘3</kbd><kbd>⌘4</kbd></span><span class="kd">Pane layout — single · two panes · two rows · four</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘[</kbd><kbd>⌘]</kbd></span><span class="kd">Cycle view mode (list · icons · columns …)</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘⇧[</kbd><kbd>⌘⇧]</kbd></span><span class="kd">Toggle left sidebar · right inspector</span></div>
+      <div class="key-row"><span class="ks"><kbd>Tab</kbd><kbd>⇧Tab</kbd></span><span class="kd">Switch panes</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌃Tab</kbd><kbd>⌃⇧Tab</kbd></span><span class="kd">Switch tabs within the pane</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌃`</kbd></span><span class="kd">Toggle terminal</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘+</kbd><kbd>⌘−</kbd></span><span class="kd">Font size (text preview · terminal)</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘T</kbd><kbd>⌘W</kbd></span><span class="kd">New tab · close tab (last tab closes the pane)</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘⌥1–9</kbd></span><span class="kd">Select tab</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘↑</kbd><kbd>⌘↓</kbd></span><span class="kd">Enclosing folder · open</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘←</kbd><kbd>⌘→</kbd></span><span class="kd">Folder history back · forward</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘C</kbd><kbd>⌘X</kbd><kbd>⌘V</kbd></span><span class="kd">Copy · cut · paste</span></div>
+      <div class="key-row"><span class="ks"><kbd>Space</kbd></span><span class="kd">Quick Look</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘I</kbd></span><span class="kd">Open · close the inspector</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘⇧D</kbd></span><span class="kd">Pin/unpin the current folder</span></div>
+      <div class="key-row"><span class="ks"><kbd>⌘⌫</kbd></span><span class="kd">Move to Trash</span></div>
+    </div>
+  </section>
+
+  <!-- Recommended tools -->
+  <section id="tools" class="showcase">
+    <h2 class="centered">Search powered by fd + ripgrep.</h2>
+    <p class="sub centered">fd finds names under the current folder instantly; ripgrep searches content. Fuzzy ranking is built in — see <a href="#install">Install</a> for setup.</p>
+
+    <div class="grid tools-grid">
+      <div class="tile">
+        <h3>fd</h3>
+        <p>Blazing-fast filename search under the current folder.</p>
+      </div>
+      <div class="tile">
+        <h3>ripgrep</h3>
+        <p>Search file <strong>contents</strong> from the command palette.</p>
+      </div>
+      <div class="tile">
+        <h3><a href="https://postmelee.github.io/alhangeul-macos/" target="_blank" rel="noopener">alhangeul ↗</a></h3>
+        <p>anf extracts HWP/HWPX body text by itself. alhangeul adds full rich QuickLook previews with formatting (optional).</p>
+      </div>
+    </div>
+    <p class="note centered">Fuzzy ranking ships inside anf. Without fd/ripgrep it falls back to macOS Spotlight (mdfind), so search works with nothing installed. alhangeul is for Korean document previews.</p>
+  </section>
+
+  <!-- Open Source -->
+  <section id="opensource" class="band">
+    <div class="band-inner">
+      <h2 class="centered">Built on open source.</h2>
+      <p class="sub centered">anf stands on these projects. Thank you.</p>
+      <div class="grid">
+        <a class="tile" href="https://github.com/xtermjs/xterm.js" target="_blank" rel="noopener">
+          <div class="oss-head"><span class="oss-name">xterm.js</span><span class="oss-lic">MIT</span></div>
+          <p>Screen rendering for the built-in terminal. v5.3.0 bundled.</p>
+        </a>
+        <div class="tile">
+          <div class="oss-head"><span class="oss-name">Apple AppKit · WebKit · QuickLook</span><span class="oss-lic">Apple SDK</span></div>
+          <p>The system frameworks behind the windows, views and previews.</p>
+        </div>
+        <div class="tile">
+          <div class="oss-head"><span class="oss-name">PTYHelper</span><span class="oss-lic">In-house</span></div>
+          <p>A small C helper that forks/execs the pseudo-terminal.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Release notes -->
+  <section id="release" class="band">
+    <div class="band-inner">
+      <h2 class="centered">Release notes.</h2>
+      <p class="sub centered">v0.3 — first public release.</p>
+      <div class="release">
+        <div class="rel-block">
+          <h3>Browsing · Performance</h3>
+          <ul>
+            <li>Native <code>getattrlistbulk(2)</code> bulk reads — a 26,000-entry folder opens in ~0.1s</li>
+            <li><strong>Revisits are instant (0ms)</strong> — the last listing paints from cache first, changes reconcile right behind it</li>
+            <li>List, icon grid and sidebar all rendered with native AppKit — instant scrolling and sorting at tens of thousands of items</li>
+            <li>List · icons · columns · gallery views (⌘[ / ⌘]), zebra-striped list, two text sizes</li>
+            <li><strong>Per-folder view memory with subtree inheritance</strong> — change the parent and the subtree follows</li>
+            <li>~0% idle CPU — the search index refreshes only when needed</li>
+          </ul>
+        </div>
+        <div class="rel-block">
+          <h3>Splits · Workspaces</h3>
+          <ul>
+            <li>Single · two panes · two rows · four panes (⌘1–4), draggable dividers</li>
+            <li><strong>Splitting starts new panes at the current folder</strong> — arrange them, then save as a Workspace</li>
+            <li>Workspaces: save/restore the layout + tabs under a name; single folders use pins ★</li>
+            <li>Tabs (⌘T · ⌃Tab), Tab to switch panes, F5/F6 copy/move across panes</li>
+          </ul>
+        </div>
+        <div class="rel-block">
+          <h3>Keyboard</h3>
+          <ul>
+            <li><strong>Type-to-select</strong> — type p to jump to the first p-item; Korean matches by initial consonant (ㅍ → 플레이그라운드), and latin keys still work under the Korean IME</li>
+            <li>Shift+arrows: contiguous ranges in the list, rectangular blocks in the icon grid</li>
+            <li>PgUp/PgDn move the selection a screenful; Home/End jump to first/last; Space for Quick Look</li>
+            <li>⌘⌥C copies the selection's path · ⌥⇧⌘C the current folder's; ⌘ shortcuts work under the Korean IME</li>
+          </ul>
+        </div>
+        <div class="rel-block">
+          <h3>Search · Preview</h3>
+          <ul>
+            <li>⌘K command palette: names via fd + fuzzy ranking, content via ripgrep, background index</li>
+            <li><strong>hwpx · docx · pptx · xlsx body-text search</strong> and inspector text previews (no extra software)</li>
+            <li>NFC/NFD Korean filename normalization; jump to SSH hosts and Workspaces from the palette</li>
+            <li>Inspector (⌘I) with Quick Look + a readable text viewer, ⌘± font size</li>
+          </ul>
+        </div>
+        <div class="rel-block">
+          <h3>File operations · Safety net</h3>
+          <ul>
+            <li><strong>⌘Z / ⌘⇧Z</strong> — undo/redo moves, renames, trashing and new folders</li>
+            <li>Name conflicts offer keep-both / overwrite / skip; large operations get a progress HUD with cancel</li>
+            <li>zip compress/extract, empty Trash, eject disks, hidden files via ⌘⇧., drag &amp; drop</li>
+            <li>Inline rename (extension auto-excluded), batch rename for multiple items</li>
+          </ul>
+        </div>
+        <div class="rel-block">
+          <h3>Remote · Terminal · Privacy</h3>
+          <ul>
+            <li><strong>GUI SFTP</strong> — browse SSH hosts like regular folders (no sshfs/macFUSE)</li>
+            <li>Built-in terminal (real PTY, ⌃`) with <strong>multiple terminal tabs</strong>, "Open Terminal Here"</li>
+            <li>Automatic ~/.ssh/config parsing; passwords are never asked for or stored (key/agent auth)</li>
+            <li>No telemetry — the only network request is a once-a-day version check; English/Korean UI</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Closing CTA -->
+  <section class="closing">
+    <h2 class="centered">Like what you see?</h2>
+    <p class="sub centered">Ideas, feedback and bug reports: <a href="https://github.com/rescenedev/anf/issues" target="_blank" rel="noopener">GitHub Issues</a> or <a href="mailto:tellme@duck.com?subject=anf%20feedback">tellme@duck.com</a>.</p>
+    <div class="cta">
+      <a class="btn" href="https://github.com/rescenedev/anf" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn" href="mailto:tellme@duck.com?subject=anf%20feedback">Send Feedback</a>
+      <a class="btn sponsor" href="https://fairy.hada.io/@lumen" target="_blank" rel="noopener">Sponsor</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <span>anf — all new finder</span>
+    <div class="footer-links">
+      <a class="footer-icon" href="https://github.com/rescenedev/anf" target="_blank" rel="noopener" aria-label="GitHub">
+        <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path>
+        </svg>
+        <span>GitHub</span>
+      </a>
+      <a href="../privacy.html">Privacy Policy</a>
+      <a href="mailto:tellme@duck.com?subject=anf%20inquiry">Contact: tellme@duck.com</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var frames = [].slice.call(document.querySelectorAll('.car-frame'));
+  var dots = [].slice.call(document.querySelectorAll('.dot'));
+  if (!frames.length) return;
+  var i = 0, timer;
+  function go(n) {
+    i = n;
+    frames.forEach(function (f, k) { f.classList.toggle('active', k === n); });
+    dots.forEach(function (d, k) { d.classList.toggle('active', k === n); });
+  }
+  function next() { go((i + 1) % frames.length); }
+  function restart() { clearInterval(timer); timer = setInterval(next, 4500); }
+  dots.forEach(function (d, k) {
+    // Hovering a layout button previews that layout above (auto-rotate pauses).
+    d.addEventListener('mouseenter', function () { clearInterval(timer); go(k); });
+    d.addEventListener('mouseleave', function () { restart(); });
+    d.addEventListener('click', function () { go(k); restart(); });
+  });
+  restart();
+})();
+
+// Copy-to-clipboard — clicking anywhere on a command cell copies it.
+document.addEventListener('click', function (e) {
+  var cell = e.target.closest('.cmd, .install-row');
+  if (!cell) return;
+  var code = cell.querySelector('code');
+  if (!code) return;
+  var btn = cell.querySelector('.copy-btn');
+  navigator.clipboard.writeText(code.textContent.trim()).then(function () {
+    if (!btn || btn.dataset.busy) return;
+    btn.dataset.busy = '1';
+    var original = btn.innerHTML;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+    btn.classList.add('copied');
+    setTimeout(function () {
+      btn.innerHTML = original; btn.classList.remove('copied'); delete btn.dataset.busy;
+    }, 1400);
+  });
+});
+</script>
+
+</body>
+</html>
