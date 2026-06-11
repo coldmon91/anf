@@ -46,6 +46,9 @@ XCTest·Swift Testing은 전체 Xcode가 필요해서, Command Line Tools 환경
 새 순수 로직(파서·정렬·랭킹 등)을 추가하면 가능한 한 테스트도 같이 추가해 주세요. CI(GitHub
 Actions, macOS)에서 `swift build` + `swift run anfTests`가 자동 실행됩니다.
 
+전체 테스트 시나리오(유닛/통합 그룹 목록, `ANF_UI_SELFTEST=1` UI 셀프테스트, 릴리즈 전
+수동 체크리스트)는 [TESTING.md](./TESTING.md)에 정리되어 있습니다.
+
 ## 코드 스타일
 
 - **작은 파일 다수 > 큰 파일 소수** (대략 200~400줄, 800줄 상한).
