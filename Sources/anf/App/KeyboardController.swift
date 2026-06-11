@@ -110,12 +110,13 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
                 }
                 return false
             case 51:  model.trashSelection(); return true           // delete → trash
-            // PgUp/PgDn/Home/End scroll the listing (Finder parity). The grid /
-            // table isn't reliably first responder, so route it explicitly.
-            case 116: if pageScroll(.pageUp) { return true }
-            case 121: if pageScroll(.pageDown) { return true }
-            case 115: if pageScroll(.home) { return true }
-            case 119: if pageScroll(.end) { return true }
+            // PgUp/PgDn move the SELECTION a viewport's worth (Explorer-style —
+            // works even when there's nothing to scroll); Home/End jump it to
+            // the first/last item. The views scroll to follow the selection.
+            case 116: model.moveSelection(by: -pageRows(), extend: shift); return true
+            case 121: model.moveSelection(by: pageRows(), extend: shift); return true
+            case 115: model.moveSelection(by: -model.items.count, extend: shift); return true
+            case 119: model.moveSelection(by: model.items.count, extend: shift); return true
             case 96:  workspace.transferToOtherPane(move: false); return true // F5 copy
             case 97:  workspace.transferToOtherPane(move: true); return true   // F6 move
             case 53:  if QLPreviewPanel.sharedPreviewPanelExists() { QLPreviewPanel.shared().orderOut(nil); return true } // esc
@@ -123,10 +124,12 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
             }
             // Type-to-select (Finder typeahead): plain printable keys jump the
             // selection to the first item matching the typed prefix. Function
-            // keys land in the U+F700 private-use block; skip those.
+            // keys land in the U+F700 private-use block; skip those. The
+            // physical key's latin letter rides along as a fallback so the
+            // Korean IME ("ㅊ" for the C key) still finds latin names.
             if !ctrl, let typed = e.characters, !typed.isEmpty,
                typed.unicodeScalars.allSatisfy({ $0.value > 0x20 && !(0xF700...0xF8FF).contains($0.value) }) {
-                model.typeSelect(typed)
+                model.typeSelect(typed, fallback: Self.latinLetter[code])
                 return true
             }
         }
@@ -205,38 +208,20 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
         return false
     }
 
-    private enum PageScroll { case pageUp, pageDown, home, end }
-
-    /// Scroll the active tab's listing (PgUp/PgDn/Home/End). Done with clip-view
-    /// math: NSResponder's `scrollPage…` default implementations only forward up
-    /// the responder chain, so calling them on the scroll view is a silent no-op.
-    /// Returns false when no live scroll view is registered so the event can
-    /// fall through to the responder chain (e.g. the columns view).
-    private func pageScroll(_ kind: PageScroll) -> Bool {
-        guard let scroll = model.contentScrollView, scroll.window != nil,
-              let doc = scroll.documentView else { return false }
-        let clip = scroll.contentView
-        let visible = clip.bounds
-        let maxY = max(0, doc.frame.height - visible.height)
-        let page = max(40, visible.height - 40)   // keep a sliver of overlap
-        var y = visible.origin.y
-        switch kind {
-        case .pageUp:   y -= page
-        case .pageDown: y += page
-        case .home:     y = 0
-        case .end:      y = maxY
+    /// Items per PgUp/PgDn step: one viewport's worth of rows in the current
+    /// view (× columns in the icon grid), derived from the live scroll view.
+    private func pageRows() -> Int {
+        guard let scroll = model.contentScrollView, scroll.window != nil else { return 10 }
+        let h = scroll.contentView.bounds.height
+        if let table = scroll.documentView as? NSTableView {
+            return max(1, Int(h / (table.rowHeight + table.intercellSpacing.height)) - 1)
         }
-        y = min(max(0, y), maxY)
-        if abs(y - visible.origin.y) > 0.5 {
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.15
-                ctx.allowsImplicitAnimation = true
-                clip.animator().setBoundsOrigin(NSPoint(x: visible.origin.x, y: y))
-                scroll.reflectScrolledClipView(clip)
-            }
-            scroll.flashScrollers()
+        if let cv = scroll.documentView as? NSCollectionView,
+           let layout = cv.collectionViewLayout as? NSCollectionViewFlowLayout {
+            let rows = max(1, Int(h / (layout.itemSize.height + layout.minimumLineSpacing)) - 1)
+            return rows * max(1, model.gridColumns)
         }
-        return true   // consume even at the edge — nothing else should beep
+        return 10
     }
 
     /// ⌘[ / ⌘] cycles the active tab's view mode (list / icons / columns / …).

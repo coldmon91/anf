@@ -188,19 +188,28 @@ enum UISelfTest {
                 @MainActor func clipY() -> CGFloat {
                     model.contentScrollView?.contentView.bounds.origin.y ?? -1
                 }
+                @MainActor func selectedIdx() -> Int? {
+                    model.items.firstIndex { model.selection.contains($0.id) }
+                }
                 check("page-scroll: icon grid registered its scroll view",
                       model.contentScrollView != nil)
                 let y0 = clipY()
                 key(121, "\u{F72D}", in: window)   // PgDn
                 await settle()
-                check("PgDn scrolls the icon grid (\(Int(y0)) → \(Int(clipY())))", clipY() > y0 + 100)
+                // One page in a short window can land while still visible, so
+                // assert the selection jump here; End/Home below prove scrolling.
+                check("PgDn moves the selection a page (idx=\(selectedIdx() ?? -1))",
+                      (selectedIdx() ?? 0) > 10)
                 key(119, "\u{F72B}", in: window)   // End
                 await settle()
                 let yEnd = clipY()
+                let endIdx = selectedIdx()
                 key(115, "\u{F729}", in: window)   // Home
                 await settle()
-                check("End reaches bottom, Home returns to top (end y=\(Int(yEnd)))",
-                      yEnd > y0 + 100 && clipY() < 1)
+                // Home parks at the top minus the 16pt section inset.
+                check("End selects the last item + scrolls, Home the first (end idx=\(endIdx ?? -1), y=\(Int(yEnd)) → \(Int(clipY())))",
+                      endIdx == model.items.count - 1 && selectedIdx() == 0
+                          && yEnd > y0 + 100 && clipY() < 20)
                 try? fm.removeItem(at: dir)
             }
 

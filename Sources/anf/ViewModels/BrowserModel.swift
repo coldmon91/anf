@@ -511,33 +511,47 @@ final class BrowserModel: Identifiable {
 
     /// Finder's type-to-select: typing jumps the selection to the first item
     /// whose name starts with the typed prefix; quick successive keys accumulate
-    /// ("pl" → "playground") and the buffer resets after a short pause. With no
-    /// prefix match the alphabetically nearest follower is selected, like
-    /// Finder. Korean matches by jamo ("ㅍ" finds "플레이그라운드").
+    /// ("pl" → "playground") and the buffer resets after a short pause. Korean
+    /// matches by jamo ("ㅍ" finds "플레이그라운드"). `fallback` is the physical
+    /// key's latin letter — under the Korean IME the C key arrives as "ㅊ", and
+    /// when that finds no prefix the latin letter is tried so c still hits
+    /// "cli". With no prefix match anywhere the alphabetically nearest follower
+    /// is selected, like Finder.
     @discardableResult
-    func typeSelect(_ typed: String, now: Date = Date()) -> Bool {
+    func typeSelect(_ typed: String, fallback: String? = nil, now: Date = Date()) -> Bool {
         guard !items.isEmpty else { return false }
         if now > typeaheadDeadline { typeahead = "" }
-        typeahead += typed
         typeaheadDeadline = now.addingTimeInterval(0.8)
         if typeaheadKeysVersion != itemsVersion {
             typeaheadKeysVersion = itemsVersion
             typeaheadKeys = items.map { HangulJamo.searchKey($0.name) }
         }
-        let query = HangulJamo.searchKey(typeahead)
 
+        func select(_ i: Int) {
+            selection = [items[i].id]
+            selAnchor = i
+            selCursor = i
+        }
+        // Prefix match, preferring what the IME produced over the raw key.
+        for candidate in [typed, fallback].compactMap({ $0 }) {
+            let query = HangulJamo.searchKey(typeahead + candidate)
+            if let hit = typeaheadKeys.firstIndex(where: { $0.hasPrefix(query) }) {
+                typeahead += candidate
+                select(hit)
+                return true
+            }
+        }
+        // No prefix anywhere → nearest follower in name order (Finder behaviour).
+        typeahead += typed
+        let query = HangulJamo.searchKey(typeahead)
         var after: (index: Int, key: String)?
         var last: (index: Int, key: String)?
-        var target: Int?
         for (i, key) in typeaheadKeys.enumerated() {
-            if key.hasPrefix(query) { target = i; break }
             if key > query, after == nil || key < after!.key { after = (i, key) }
             if last == nil || key > last!.key { last = (i, key) }
         }
-        guard let hit = target ?? after?.index ?? last?.index else { return false }
-        selection = [items[hit].id]
-        selAnchor = hit
-        selCursor = hit
+        guard let target = after?.index ?? last?.index else { return false }
+        select(target)
         return true
     }
 

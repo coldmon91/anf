@@ -61,5 +61,16 @@ func runTypeaheadTests() {
             T.equal(selectedName(), "playground",
                     "no c-item → alphabetically nearest following name")
         }
+
+        T.group("typeSelect: Korean IME falls back to the physical key") {
+            model.typeSelect("ㅂ", fallback: "b", now: t0.addingTimeInterval(12))
+            T.equal(selectedName(), "backup",
+                    "ㅂ has no Korean match → physical 'b' finds backup")
+            model.typeSelect("ㅣ", fallback: "l", now: t0.addingTimeInterval(12.2))
+            T.equal(selectedName(), "blog", "mixed buffer keeps using the latin stream")
+            model.typeSelect("ㅍ", fallback: "v", now: t0.addingTimeInterval(15))
+            T.equal(selectedName(), "플레이그라운드",
+                    "Korean prefix still wins over the fallback letter")
+        }
     }
 }
