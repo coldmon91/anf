@@ -252,6 +252,10 @@ struct FileListView: NSViewRepresentable {
             model.sort = SortOrder(key: mapped, ascending: d.ascending)
         }
 
+        func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+            RoundedRowView()
+        }
+
         // MARK: Drag
 
         func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
@@ -314,6 +318,22 @@ struct FileListView: NSViewRepresentable {
             add(L("Move to Trash", "휴지통으로 이동")) { self.model.trashSelection() }
             return menu
         }
+    }
+}
+
+/// Rounded, inset selection highlight drawn by hand: the system `.inset` style
+/// renders it correctly in a lone pane but falls back to square full-bleed rows
+/// when the pane is narrow (horizontal scrolling) — custom drawing is identical
+/// everywhere.
+final class RoundedRowView: NSTableRowView {
+    override func drawSelection(in dirtyRect: NSRect) {
+        guard selectionHighlightStyle != .none else { return }
+        let rect = bounds.insetBy(dx: 6, dy: 1)
+        let color = isEmphasized
+            ? NSColor.selectedContentBackgroundColor
+            : NSColor.unemphasizedSelectedContentBackgroundColor
+        color.setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 7, yRadius: 7).fill()
     }
 }
 
