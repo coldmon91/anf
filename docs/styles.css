@@ -385,6 +385,13 @@ kbd {
   .nav-links a:not(:last-child):not(.nav-lang) { display: none; }
 }
 
+/* 1.0 version pill in the hero eyebrow */
+.ver-pill {
+  display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px;
+  font-weight: 800; color: #fff; letter-spacing: 0; vertical-align: middle;
+  background: linear-gradient(90deg, #2997ff, #7c5cff 60%, #ff5ea8);
+}
+
 /* ---- Vault flagship section ---- */
 .vault-band {
   position: relative;
