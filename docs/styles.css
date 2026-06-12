@@ -385,6 +385,40 @@ kbd {
   .nav-links a:not(:last-child):not(.nav-lang) { display: none; }
 }
 
+/* ---- Vault flagship section ---- */
+.vault-band {
+  position: relative;
+  background:
+    radial-gradient(900px 380px at 50% -120px, rgba(124,92,255,.16), transparent 70%),
+    radial-gradient(700px 320px at 80% 120%, rgba(41,151,255,.12), transparent 70%);
+  border-block: 1px solid var(--line);
+}
+.vault-badge {
+  display: inline-block; margin: 0 auto 18px; padding: 6px 16px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .04em; color: #fff;
+  background: linear-gradient(90deg, #2997ff, #7c5cff 55%, #ff5ea8);
+  box-shadow: 0 6px 20px rgba(124,92,255,.35);
+}
+.vault-band .centered, .vault-band .vault-badge { text-align: center; }
+.vault-band { text-align: center; }
+.vault-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  max-width: 1000px; margin: 52px auto 0; text-align: left;
+}
+.vault-step {
+  background: var(--tile); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 28px 26px; position: relative;
+}
+.vault-num {
+  width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center;
+  justify-content: center; font-weight: 800; font-size: 17px; color: #fff; margin-bottom: 16px;
+  background: linear-gradient(135deg, #2997ff, #7c5cff);
+}
+.vault-step h3 { font-size: 17px; margin-bottom: 10px; }
+.vault-step p { color: var(--txt-dim); font-size: 14.5px; line-height: 1.6; }
+.vault-band .ticks { margin-top: 30px; }
+@media (max-width: 880px) { .vault-grid { grid-template-columns: 1fr; } }
+
 /* Hero install CTA */
 .hero-cta {
   display: flex; align-items: center; gap: 14px; justify-content: center;
