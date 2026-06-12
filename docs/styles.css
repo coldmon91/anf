@@ -383,6 +383,12 @@ kbd {
   .band-inner, .showcase { padding: 64px 22px; }
   /* Mobile nav keeps only the essentials: language switcher + sponsor */
   .nav-links a:not(:last-child):not(.nav-lang) { display: none; }
+  /* Footer: stack vertically and let the links wrap, or the space-padding Korean
+     "개인정보처리방침" gets squeezed into one char per line. */
+  .footer-inner {
+    flex-direction: column; align-items: flex-start; gap: 14px; text-align: left;
+  }
+  .footer-links { flex-wrap: wrap; gap: 10px 18px; }
 }
 
 /* 1.0 version pill in the hero eyebrow */
