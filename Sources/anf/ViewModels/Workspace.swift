@@ -580,6 +580,10 @@ final class WorkspaceModel {
         // result as a Workspace. Panes that were already visible keep theirs.
         if l.count > oldCount {
             for i in oldCount..<min(l.count, panes.count) {
+                // Reuse the pane's existing model when it already shows `here` —
+                // a fresh BrowserModel forces SwiftUI to rebuild that pane's
+                // table view, which is the entire cost of ⌘1–4 on big folders.
+                if panes[i].tabs.count == 1, panes[i].current.currentURL == here { continue }
                 panes[i].replaceTabs([BrowserModel(start: here)], activeIndex: 0)
             }
         }

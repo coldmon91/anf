@@ -20,11 +20,16 @@ struct PaneLayoutView: View {
         GeometryReader { geo in
             ZStack(alignment: .topLeading) {
                 ForEach(0..<4, id: \.self) { i in
-                    if let r = rect(for: i, in: geo.size) {
-                        pane(i)
-                            .frame(width: r.width, height: r.height)
-                            .offset(x: r.minX, y: r.minY)
-                    }
+                    // Hidden panes stay MOUNTED (zero frame, invisible) rather than
+                    // unmounting: tearing one down destroys its NSTableView, and
+                    // re-revealing it would rebuild a 26k-row listing. Kept alive,
+                    // ⌘1–4 is pure geometry.
+                    let r = rect(for: i, in: geo.size)
+                    pane(i)
+                        .frame(width: r?.width ?? 0, height: r?.height ?? 0)
+                        .offset(x: r?.minX ?? 0, y: r?.minY ?? 0)
+                        .opacity(r == nil ? 0 : 1)
+                        .allowsHitTesting(r != nil)
                 }
                 if workspace.layout == .dual || workspace.layout == .quad {
                     columnHandle(totalWidth: geo.size.width - grip)

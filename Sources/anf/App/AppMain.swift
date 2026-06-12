@@ -45,6 +45,9 @@ final class AppController: NSObject, NSApplicationDelegate {
             if UISelfTest.isRequested {
                 UISelfTest.run(window: window, workspace: workspace)
             }
+            if LayoutBench.isRequested {
+                LayoutBench.run(window: window, workspace: workspace)
+            }
             if let pick = ProcessInfo.processInfo.environment["ANF_SELECT_FIRST"] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     workspace.inspectorVisible = true
