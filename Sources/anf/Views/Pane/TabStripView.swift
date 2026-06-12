@@ -35,7 +35,10 @@ struct TabStripView: View {
             .padding(.horizontal, 8)
         }
         .frame(height: 30)
-        .background(.bar)
+        // Match the column header / window surface (not the lighter `.bar`
+        // material) so the toolbar → tabs → list header read as one continuous
+        // piece instead of three stacked bands.
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private func title(_ tab: BrowserModel) -> String {

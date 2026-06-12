@@ -226,7 +226,7 @@ final class BrowserModel: Identifiable {
 
     // MARK: - Navigation
 
-    func navigate(to url: URL, recordHistory: Bool = true) {
+    func navigate(to url: URL, recordHistory: Bool = true, returningFrom: URL? = nil) {
         onActivity?()
         guard url != currentURL else { return }
         if recordHistory {
@@ -240,10 +240,15 @@ final class BrowserModel: Identifiable {
         }
         applyFolderViewMode()
         reload()
-        // Land with the first row selected so keyboard navigation continues
-        // immediately. revealFile and friends overwrite this with their own
-        // selection afterwards (this only fills an EMPTY selection).
-        selectFirstWhenLoaded()
+        // Going up to an ancestor → land on the child we came from. Otherwise land
+        // with the first row selected so keyboard navigation continues immediately.
+        // revealFile and friends overwrite this with their own selection afterwards
+        // (this only fills an EMPTY selection).
+        if let returningFrom {
+            selectReturning(to: url, from: returningFrom)
+        } else {
+            selectFirstWhenLoaded()
+        }
     }
 
     func open(_ item: FileItem) {
@@ -278,11 +283,14 @@ final class BrowserModel: Identifiable {
 
     func goBack() {
         guard let prev = back.popLast() else { return }
+        let left = currentURL          // the folder we're leaving
         forward.append(currentURL)
         currentURL = prev
         applyFolderViewMode()
         reload()
-        selectFirstWhenLoaded()
+        // Returning to an ancestor: land on the child we'd descended into, not the
+        // top of the list, so the eye stays where it was.
+        selectReturning(to: prev, from: left)
     }
 
     func goForward() {
@@ -296,13 +304,33 @@ final class BrowserModel: Identifiable {
 
     func goUp() {
         guard canGoUp else { return }
+        let left = currentURL
         if isRemote, let host = remoteHost {
             let parent = (remotePath as NSString).deletingLastPathComponent
-            navigate(to: Self.remoteURL(host: host, path: parent.isEmpty ? "/" : parent))
+            navigate(to: Self.remoteURL(host: host, path: parent.isEmpty ? "/" : parent),
+                     returningFrom: left)
             return
         }
-        navigate(to: currentURL.deletingLastPathComponent())
-        // navigate() selects the first row once the listing lands.
+        navigate(to: currentURL.deletingLastPathComponent(), returningFrom: left)
+    }
+
+    /// The direct child of `parent` that lies on the path down to `descendant`,
+    /// or nil if `descendant` isn't actually under `parent`.
+    private func childOnPath(from parent: URL, toward descendant: URL) -> URL? {
+        let p = parent.standardizedFileURL.pathComponents
+        let d = descendant.standardizedFileURL.pathComponents
+        guard d.count > p.count, Array(d.prefix(p.count)) == p else { return nil }
+        return parent.appendingPathComponent(d[p.count])
+    }
+
+    /// After returning to `parent`, select the child we came from (`left`); falls
+    /// back to the first row if that child isn't in the listing.
+    private func selectReturning(to parent: URL, from left: URL) {
+        if let child = childOnPath(from: parent, toward: left) {
+            selectChildWhenLoaded(child)
+        } else {
+            selectFirstWhenLoaded()
+        }
     }
 
     /// After an async load lands, put the selection on the first row so keyboard
@@ -319,6 +347,28 @@ final class BrowserModel: Identifiable {
                 guard token == loadToken else { return }   // superseded
                 if itemsVersion != versionBefore, let first = items.first {
                     if selection.isEmpty { selection = [first.id] }
+                    return
+                }
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }
+        }
+    }
+
+    /// After the new listing commits, select the item matching `child` (and scroll
+    /// to it). Falls back to the first row if it isn't present.
+    private func selectChildWhenLoaded(_ child: URL) {
+        let token = loadToken
+        let versionBefore = itemsVersion
+        let wanted = child.standardizedFileURL.path
+        Task { @MainActor in
+            for _ in 0..<20 {
+                guard token == loadToken else { return }
+                if itemsVersion != versionBefore {
+                    if let match = items.first(where: { $0.url.standardizedFileURL.path == wanted }) {
+                        selection = [match.id]
+                    } else if selection.isEmpty, let first = items.first {
+                        selection = [first.id]
+                    }
                     return
                 }
                 try? await Task.sleep(nanoseconds: 50_000_000)

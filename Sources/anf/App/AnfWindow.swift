@@ -127,6 +127,9 @@ final class AnfWindowController: NSObject, NSWindowDelegate {
         self.toolbarController = toolbarController
         window.toolbar = toolbarController.makeToolbar()
         window.toolbarStyle = .unified
+        // Seamless top like Finder: no hairline under the toolbar, so the toolbar,
+        // tab strip and content read as one continuous surface.
+        window.titlebarSeparatorStyle = .none
         self.window = window
         super.init()
 
