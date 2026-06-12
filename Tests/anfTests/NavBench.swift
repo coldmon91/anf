@@ -1,6 +1,53 @@
 import Foundation
 @testable import anf
 
+/// Soak: walk EVERY directory under a root through the production read+sort
+/// path and report the worst offenders. Run with
+///   ANF_SOAK=/Users/zihado/work swift run anfTests
+/// Surfaces pathological folders (huge counts, slow sorts, unreadable dirs)
+/// that ad-hoc testing never visits.
+func runSoak(root: String) {
+    let clock = ContinuousClock()
+    @inline(__always) func ms(_ d: Duration) -> Double { Double(d.components.seconds) * 1_000 + Double(d.components.attoseconds) / 1e15 }
+
+    var queue = [root]
+    var visited = 0, unreadable = 0
+    var worst: [(ms: Double, count: Int, path: String)] = []
+    var biggest: [(count: Int, path: String)] = []
+    let t0 = clock.now
+
+    while let dir = queue.popLast() {
+        guard let entries = FastDirRead.list(path: dir) else { unreadable += 1; continue }
+        visited += 1
+        let tSort0 = clock.now
+        let items = entries.map { FileItem.fast(parentPath: dir, entry: $0) }
+        let sorted = FileSystemService.fastNameSort(items, ascending: true)
+        let elapsed = ms(clock.now - tSort0)
+
+        worst.append((elapsed, sorted.count, dir))
+        worst.sort { $0.ms > $1.ms }
+        if worst.count > 10 { worst.removeLast() }
+        biggest.append((sorted.count, dir))
+        biggest.sort { $0.count > $1.count }
+        if biggest.count > 10 { biggest.removeLast() }
+
+        for e in entries where e.isDir && !e.isSymlink {
+            // Skip bundle-ish/dependency trees a user wouldn't browse item by item?
+            // No — browse EVERYTHING; that's the point of a soak.
+            queue.append((dir as NSString).appendingPathComponent(e.name))
+        }
+    }
+    print("soak: \(visited) dirs under \(root) in \(String(format: "%.1fs", ms(clock.now - t0) / 1000)) (\(unreadable) unreadable)")
+    print("slowest build+sort:")
+    for w in worst {
+        print(String(format: "  %7.1fms  %6d items  %@", w.ms, w.count, w.path))
+    }
+    print("largest:")
+    for b in biggest {
+        print(String(format: "  %6d items  %@", b.count, b.path))
+    }
+}
+
 /// PDF body-extraction latency breakdown. Run with
 ///   ANF_BENCH_PDF=/folder/with/pdfs swift run anfTests
 /// Prints per-file size/pages/ms plus the worst case and the wall-clock of the
@@ -8,7 +55,7 @@ import Foundation
 func runPDFBench(path: String) {
     let clock = ContinuousClock()
     @inline(__always) func ms(_ d: Duration) -> Double {
-        Double(d.components.attoseconds) / 1e15
+        Double(d.components.seconds) * 1_000 + Double(d.components.attoseconds) / 1e15
     }
     let fm = FileManager.default
     var pdfs: [URL] = []
@@ -49,7 +96,7 @@ func runPDFBench(path: String) {
 /// and it prints where the milliseconds go (bulk read → FileItem build → sort).
 func runNavBench(path: String) {
     @inline(__always) func ms(_ t: ContinuousClock.Instant, _ u: ContinuousClock.Instant) -> String {
-        String(format: "%6.1fms", Double((u - t).components.attoseconds) / 1e15)
+        String(format: "%6.1fms", Double((u - t).components.seconds) * 1_000 + Double((u - t).components.attoseconds) / 1e15)
     }
     let clock = ContinuousClock()
     print("bench: \(path)")

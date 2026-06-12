@@ -187,6 +187,7 @@ public func anfMain() {
     // Toolbar icons rely on hover tooltips to explain themselves — the system
     // default delay (~1.5s) makes them feel absent, so shorten it app-wide.
     UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 500])
+    HangWatchdog.startIfRequested()
     let app = NSApplication.shared
     let controller = AppController()
     app.delegate = controller

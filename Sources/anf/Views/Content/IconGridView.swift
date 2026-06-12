@@ -108,10 +108,9 @@ struct IconGridView: NSViewRepresentable {
         private func applySelection(_ cv: NSCollectionView, force: Bool = false, scroll: Bool) {
             if !force, lastAppliedSelection == model.selection { return }
             lastAppliedSelection = model.selection
-            var want = Set<IndexPath>()
-            for (i, item) in items.enumerated() where model.selection.contains(item.id) {
-                want.insert(IndexPath(item: i, section: 0))
-            }
+            let want = Set(model.selection.compactMap { id in
+                model.index(of: id).map { IndexPath(item: $0, section: 0) }
+            })
             guard want != cv.selectionIndexPaths else { return }
             syncingSelection = true
             cv.deselectItems(at: cv.selectionIndexPaths)

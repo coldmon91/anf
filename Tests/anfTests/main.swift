@@ -12,6 +12,10 @@ if let pdfPath = ProcessInfo.processInfo.environment["ANF_BENCH_PDF"] {
     runPDFBench(path: pdfPath)
     exit(0)
 }
+if let soakRoot = ProcessInfo.processInfo.environment["ANF_SOAK"] {
+    runSoak(root: soakRoot)
+    exit(0)
+}
 
 runFuzzyMatchTests()
 runNormalizedRankTests()

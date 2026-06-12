@@ -32,7 +32,7 @@ func runListDiffTests() {
         let clock = ContinuousClock()
         let t0 = clock.now
         _ = ListDiff.strategy(old: ids, new: ids.reversed())
-        let elapsed = Double((clock.now - t0).components.attoseconds) / 1e15
+        let elapsed = { let d = clock.now - t0; return Double(d.components.seconds) * 1_000 + Double(d.components.attoseconds) / 1e15 }()
         T.expect(elapsed < 100,
                  "26k reorder decision takes \(String(format: "%.1f", elapsed))ms (must be <100ms)")
     }

@@ -165,9 +165,7 @@ struct FileListView: NSViewRepresentable {
             guard let table else { return }
             if !force, lastAppliedSelection == model.selection { return }
             lastAppliedSelection = model.selection
-            let want = IndexSet(items.enumerated()
-                .filter { model.selection.contains($0.element.id) }
-                .map(\.offset))
+            let want = IndexSet(model.selection.compactMap { model.index(of: $0) })
             if want != table.selectedRowIndexes {
                 syncingSelection = true
                 table.selectRowIndexes(want, byExtendingSelection: false)

@@ -509,6 +509,21 @@ final class BrowserModel: Identifiable {
     @ObservationIgnored private var typeaheadKeys: [String] = []
     @ObservationIgnored private var typeaheadKeysVersion = -1
 
+    /// Row index for an id in the current listing — O(1) via a map rebuilt once
+    /// per listing change. The table/grid selection sync used to scan all items
+    /// per selection change (every arrow key in a 26k folder).
+    @ObservationIgnored private var idIndexCache: [FileItem.ID: Int] = [:]
+    @ObservationIgnored private var idIndexVersion = -1
+
+    func index(of id: FileItem.ID) -> Int? {
+        if idIndexVersion != itemsVersion {
+            idIndexVersion = itemsVersion
+            idIndexCache = Dictionary(items.enumerated().map { ($0.element.id, $0.offset) },
+                                      uniquingKeysWith: { a, _ in a })
+        }
+        return idIndexCache[id]
+    }
+
     /// Lowercased + jamo-expanded keys for the current listing, index-aligned
     /// with `items`. Shared by typeahead and the palette's local filter so the
     /// per-keystroke work is a byte-wise `contains`, never a 26k Unicode
