@@ -22,12 +22,11 @@ enum FileTags {
         (try? url.resourceValues(forKeys: [.tagNamesKey]))?.tagNames ?? []
     }
 
-    /// Replace the file's tags wholesale.
+    /// Replace the file's tags wholesale. The typed `URLResourceValues.tagNames`
+    /// SETTER is macOS 26-only; the NSURL spelling writes the same
+    /// NSURLTagNamesKey xattr and works on every macOS we support.
     static func setTags(_ tags: [String], on url: URL) {
-        var u = url
-        var v = URLResourceValues()
-        v.tagNames = tags
-        try? u.setResourceValues(v)
+        try? (url as NSURL).setResourceValue(tags as NSArray, forKey: .tagNamesKey)
     }
 
     /// Toggle one standard colour tag on/off.

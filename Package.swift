@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "anf",
-    platforms: [.macOS("26.0")],
+    platforms: [.macOS("14.0")],
     dependencies: [],
     targets: [
         .target(

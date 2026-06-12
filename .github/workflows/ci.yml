@@ -7,8 +7,13 @@ on:
 
 jobs:
   test:
-    # anf targets macOS 26; needs a runner with the macOS 26 SDK.
-    runs-on: macos-26
+    # macos-26 = the dev/release environment; macos-15 proves the lowered
+    # macOS 14 deployment target actually RUNS on Sequoia, not just compiles.
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, macos-15]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
 
