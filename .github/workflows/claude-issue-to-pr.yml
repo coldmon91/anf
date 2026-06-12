@@ -35,8 +35,10 @@ jobs:
             actions: read
           # 기본 허용 목록에 gh issue/pr 가 없어 이슈 본문 읽기부터 거부됐다 —
           # 이 자동화가 실제로 쓰는 도구를 명시적으로 허용한다.
+          # 주의: --allowedTools 는 기본 목록을 '대체'한다 — 파일 도구(Read/Edit/
+          # Write)까지 전부 명시해야 한다 (빼먹으면 편집 단계에서 거부됨).
           claude_args: |
-            --allowedTools "Bash(git:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh release:*),Bash(swift:*),Bash(python3:*),Bash(./build.sh:*),Bash(ls:*),Bash(cat:*),Bash(grep:*),Bash(find:*)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh release:*),Bash(swift:*),Bash(python3:*),Bash(./build.sh:*),Bash(ls:*),Bash(cat:*),Bash(grep:*),Bash(find:*)"
           prompt: |
             GitHub 이슈 #${{ github.event.issue.number }} 를 해결하세요.
             제목: ${{ github.event.issue.title }}
