@@ -75,6 +75,12 @@
 "Couldn’t restore from Trash" = "휴지통에서 복원하지 못했습니다";
 "sshfs is not installed.\n\nMounting needs macFUSE + sshfs:\n  brew install --cask macfuse\n  brew install gromgit/fuse/sshfs-mac\n\nOr use ‘SFTP (Terminal)’ from the sidebar instead." = "sshfs가 설치되어 있지 않습니다.\n\n그래픽 탐색을 하려면 macFUSE + sshfs가 필요합니다:\n  brew install --cask macfuse\n  brew install gromgit/fuse/sshfs-mac\n\n설치가 어렵다면 사이드바에서 'SFTP (터미널)'을 쓰세요.";
 "SFTP Mount" = "SFTP 마운트";
+"Snapshot" = "스냅샷";
+"Couldn’t create Vault" = "Vault를 만들지 못했습니다";
+"git is required and must be available." = "git이 필요합니다.";
+"Turn off Vault for this folder?" = "이 폴더의 Vault를 끌까요?";
+"Your files stay. The version history and protection are removed." = "파일은 그대로 유지됩니다. 버전 히스토리와 보호만 제거됩니다.";
+"Turn Off" = "끄기";
 "Rename" = "이름 변경";
 "Replace text in each name:" = "각 이름에서 찾아 바꿀 텍스트:";
 "Find" = "찾기";
@@ -98,6 +104,10 @@
 "user (optional)" = "사용자명 (선택)";
 "~/.ssh/id_rsa (optional)" = "~/.ssh/id_rsa (선택)";
 "Choose Key File" = "키 파일 선택";
+"When" = "시점";
+"Recoverable files" = "복구 가능한 파일";
+"Recover Selected" = "선택 복구";
+"Nothing was deleted since this point" = "이 시점 이후 삭제된 파일 없음";
 "Search everything — names, contents, even hwpx/pdf body text" = "모든 것 검색 — 파일명·내용, hwpx·pdf 본문까지";
 "type" = "타이핑";
 "Just type to jump — Korean initial consonants work (ㄱㅊ → 경찰청)" = "그냥 입력하면 점프 — 초성도 됩니다 (ㄱㅊ → 경찰청)";
@@ -130,6 +140,10 @@
 "Reveal in Finder" = "Finder에서 보기";
 "Move to Trash" = "휴지통으로 이동";
 "Get Info" = "정보 가져오기";
+"Vault Timeline…" = "Vault 타임라인…";
+"Snapshot Now" = "지금 스냅샷";
+"Turn Off Vault…" = "Vault 끄기…";
+"Protect with Vault…" = "Vault로 보호하기…";
 "Copy Folder Path" = "현재 폴더 경로 복사";
 "Hide Hidden Files" = "숨김 파일 가리기";
 "No Items" = "항목 없음";
