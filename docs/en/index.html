@@ -20,7 +20,7 @@
 <meta name="theme-color" content="#060607">
 <link rel="alternate" hreflang="ko" href="https://rescenedev.github.io/anf/">
 <link rel="alternate" hreflang="en" href="https://rescenedev.github.io/anf/en/">
-<link rel="stylesheet" href="../styles.css?v=12">
+<link rel="stylesheet" href="../styles.css?v=13">
 </head>
 <body>
 
@@ -430,68 +430,54 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
   <section id="release" class="band">
     <div class="band-inner">
       <h2 class="centered">Release notes.</h2>
-      <p class="sub centered">v1.0 — first public release.</p>
+      <p class="sub centered">v1.0 — first public release. The fastest native file browser for macOS.</p>
       <div class="release">
         <div class="rel-block">
-          <h3>Browsing · Performance</h3>
+          <h3>Speed</h3>
           <ul>
-            <li>Native <code>getattrlistbulk(2)</code> bulk reads — a 26,000-entry folder opens in ~0.1s</li>
-            <li><strong>Revisits are instant (0ms)</strong> — the last listing paints from cache first, changes reconcile right behind it</li>
-            <li>List, icon grid and sidebar all rendered with native AppKit — instant scrolling and sorting at tens of thousands of items</li>
-            <li>List · icons · columns · gallery views (⌘[ / ⌘]), zebra-striped list, two text sizes</li>
-            <li><strong>Per-folder view memory with subtree inheritance</strong> — change the parent and the subtree follows</li>
-            <li>~0% idle CPU — the search index refreshes only when needed</li>
+            <li><code>getattrlistbulk(2)</code> bulk reads — a 26,000-entry folder opens in ~0.1s, revisits in 0ms</li>
+            <li>List, icon grid and sidebar all native AppKit — instant scrolling and sorting at tens of thousands of items</li>
+            <li>~0% idle CPU; bounded thumbnail generation and a sidebar that doesn't rebuild on navigation</li>
           </ul>
         </div>
         <div class="rel-block">
-          <h3>Splits · Workspaces</h3>
+          <h3>Search</h3>
           <ul>
-            <li>Single · two panes · two rows · four panes (⌘1–4), draggable dividers</li>
-            <li><strong>Splitting starts new panes at the current folder</strong> — arrange them, then save as a Workspace</li>
-            <li>Workspaces: save/restore the layout + tabs under a name; single folders use pins ★</li>
-            <li>Tabs (⌘T · ⌃Tab), Tab to switch panes, F5/F6 copy/move across panes</li>
-            <li><strong>Multiple windows</strong> — ⌘N opens independent windows, each with its own folders, tabs and selection</li>
-            <li>Collapse by accident, restore in one click — View → <strong>Restore Last Split Layout</strong></li>
+            <li>⌘K palette — names via fd + built-in fuzzy ranking, content via ripgrep (falls back to Spotlight without them)</li>
+            <li><strong>Korean initial-consonant search</strong> and <strong>hwpx·docx·pdf body-text search</strong>, no extra software</li>
+            <li>NFC/NFD normalization; jump to SSH hosts and Workspaces from the palette</li>
           </ul>
         </div>
         <div class="rel-block">
-          <h3>Keyboard</h3>
+          <h3>Windows · Keyboard</h3>
           <ul>
-            <li><strong>Type-to-select</strong> — type p to jump to the first p-item; Korean matches by initial consonant (ㅍ → 플레이그라운드), and latin keys still work under the Korean IME</li>
-            <li>Shift+arrows: contiguous ranges in the list, rectangular blocks in the icon grid</li>
-            <li>PgUp/PgDn move the selection a screenful; Home/End jump to first/last; Space for Quick Look</li>
-            <li>⌘⌥C copies the selection's path · ⌥⇧⌘C the current folder's; ⌘ shortcuts work under the Korean IME</li>
-            <li>A first-run shortcut card teaches the eight essentials in 30 seconds (reopenable from the View menu)</li>
+            <li><strong>Multiple windows</strong> (⌘N) · single/two/four panes · named <strong>Workspaces</strong></li>
+            <li>Type-to-select, Shift+arrow block selection, PgUp/PgDn paging, F5/F6 copy/move across panes</li>
+            <li>⌘ shortcuts that work under the Korean IME, a first-run shortcut card</li>
           </ul>
         </div>
         <div class="rel-block">
-          <h3>Search · Preview</h3>
+          <h3>File operations</h3>
           <ul>
-            <li>⌘K command palette: names via fd + fuzzy ranking, content via ripgrep, background index</li>
-            <li><strong>hwpx · docx · pptx · xlsx · pdf body-text search</strong> and inspector text previews (no extra software)</li>
-            <li>NFC/NFD Korean filename normalization; jump to SSH hosts and Workspaces from the palette</li>
-            <li>Inspector (⌘I) with Quick Look + a readable text viewer, ⌘± font size</li>
+            <li><strong>Extract</strong> zip·7z·tar.gz·cpio and more with no extra install (rar·alz via unar); zip compress</li>
+            <li><strong>⌘Z undo</strong> (move, rename, Trash), conflict dialogs, background copy faster than cp</li>
+            <li><strong>Get Info (⌘⌥I) and colour tags</strong> (Finder-compatible); status bar shows item count and free space</li>
           </ul>
         </div>
         <div class="rel-block">
-          <h3>File operations · Safety net</h3>
+          <h3>Remote · Privacy</h3>
           <ul>
-            <li><strong>Vault time-travel</strong> — protect a folder and recover files even after emptying the Trash (local git, 5-min auto snapshots, dev folders isolated in .anf_vault)</li>
-            <li><strong>⌘Z / ⌘⇧Z</strong> — undo/redo moves, renames, trashing and new folders</li>
-            <li>Name conflicts offer keep-both / overwrite / skip; large operations get a progress HUD with cancel</li>
-            <li>Large copies run fully in the background — progress HUD with mid-tree cancel; small jobs finish silently</li>
-            <li>zip compress/extract, empty Trash, eject disks, hidden files via ⌘⇧., drag &amp; drop</li>
-            <li>Inline rename (extension auto-excluded), batch rename for multiple items</li>
-            <li><strong>Get Info (⌘⌥I)</strong> — size, dates, permissions, path + <strong>colour tags</strong> (interoperate with Finder); status bar shows item count and free space</li>
-          </ul>
-        </div>
-        <div class="rel-block">
-          <h3>Remote · Terminal · Privacy</h3>
-          <ul>
-            <li><strong>GUI SFTP</strong> — browse SSH hosts like regular folders (no sshfs/macFUSE)</li>
-            <li>Built-in terminal (real PTY, ⌃`) with <strong>multiple terminal tabs</strong>, "Open Terminal Here"</li>
+            <li><strong>GUI SFTP</strong> — browse SSH hosts like folders (no sshfs); built-in terminal (real PTY, multiple tabs)</li>
             <li>Automatic ~/.ssh/config parsing; passwords are never asked for or stored (key/agent auth)</li>
-            <li>No telemetry — the only network request is a once-a-day version check. English/Korean UI; new languages are one translation file away</li>
+            <li>Zero telemetry — the only request is a once-a-day version check; EN/KO UI; MIT open source</li>
+          </ul>
+        </div>
+        <div class="rel-block">
+          <h3>one more thing</h3>
+          <ul>
+            <li><strong>Vault</strong> — protect a folder and recover files even after emptying the Trash</li>
+            <li>Background snapshots every 5 minutes, local only, no cloud</li>
+            <li>Built on local git — zero new dependencies; dev folders isolated in .anf_vault</li>
           </ul>
         </div>
       </div>
