@@ -51,6 +51,8 @@
 "Size" = "크기";
 "Kind" = "종류";
 "Couldn’t compress" = "압축하지 못했습니다";
+"This format needs ‘unar’" = "이 형식은 ‘unar’가 필요합니다";
+"Install it once with: brew install unar" = "한 번만 설치하세요: brew install unar";
 "Couldn’t extract" = "압축을 풀지 못했습니다";
 "Empty the Trash?" = "휴지통을 비우시겠습니까?";
 "Empty Trash" = "비우기";
