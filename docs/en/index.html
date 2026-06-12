@@ -7,7 +7,7 @@
 <meta name="description" content="A fast, lightweight native file browser for macOS. Split panes, built-in terminal, command palette.">
 <link rel="alternate" hreflang="ko" href="https://rescenedev.github.io/anf/">
 <link rel="alternate" hreflang="en" href="https://rescenedev.github.io/anf/en/">
-<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="../styles.css?v=2">
 </head>
 <body>
 
@@ -138,7 +138,7 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
   <section id="performance" class="showcase">
     <h2 class="centered">Why it's fast.</h2>
     <p class="sub centered">Speed is a design decision, not an accident. All numbers measured.</p>
-    <table class="perf-table">
+    <div class="perf-wrap"><table class="perf-table">
       <thead><tr><th>Benchmark</th><th>Result</th><th>Notes</th></tr></thead>
       <tbody>
         <tr><td>Bulk-read a 26,549-entry folder</td><td class="num">23.8 ms</td><td>getattrlistbulk — <strong>46×</strong> faster than the old Foundation full-stat path (1,084ms)</td></tr>
@@ -149,7 +149,7 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
         <tr><td>Soak across 150,696 directories</td><td class="num">0 failures</td><td>a real home tree through the production read+sort path, all &lt;55ms except the 26k outlier</td></tr>
         <tr><td>Idle CPU</td><td class="num">~0 %</td><td>the index refreshes only when needed</td></tr>
       </tbody>
-    </table>
+    </table></div>
     <p class="perf-caption">Apple M4 Pro · macOS 26. Harnesses, baselines and repro steps are public in
       <a href="https://github.com/rescenedev/anf/blob/main/PERFORMANCE.md" target="_blank" rel="noopener">PERFORMANCE.md</a> and
       <a href="https://github.com/rescenedev/anf/blob/main/TESTING.md" target="_blank" rel="noopener">TESTING.md</a>.</p>

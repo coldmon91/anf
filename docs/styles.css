@@ -381,9 +381,12 @@ kbd {
 }
 
 /* ---- Performance table ---- */
+.perf-wrap {
+  max-width: 880px; margin: 44px auto 16px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
 .perf-table {
-  width: 100%; max-width: 880px; margin: 0 auto 16px;
-  border-collapse: collapse; font-size: 14.5px;
+  width: 100%; border-collapse: collapse; font-size: 14.5px;
 }
 .perf-table th, .perf-table td {
   text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line);
@@ -396,12 +399,14 @@ kbd {
 .perf-table .num { color: var(--txt); font-weight: 650; white-space: nowrap; }
 .perf-caption {
   max-width: 880px; margin: 0 auto 48px; color: var(--txt-faint);
-  font-size: 12.5px; text-align: center;
+  font-size: 12.5px; text-align: center; padding: 0 8px;
 }
 .perf-caption a { color: var(--accent); }
 @media (max-width: 720px) {
   .perf-table { font-size: 13px; }
   .perf-table th, .perf-table td { padding: 9px 8px; }
+  /* Drop the notes column on phones — item + number must never overflow. */
+  .perf-table th:nth-child(3), .perf-table td:nth-child(3) { display: none; }
 }
 
 .closing .sub a { color: var(--accent); }

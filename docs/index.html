@@ -7,7 +7,7 @@
 <meta name="description" content="macOS를 위한 가볍고 빠른 네이티브 파일 브라우저. 분할 뷰, 내장 터미널, 커맨드 팔레트.">
 <link rel="alternate" hreflang="ko" href="https://rescenedev.github.io/anf/">
 <link rel="alternate" hreflang="en" href="https://rescenedev.github.io/anf/en/">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 
@@ -138,7 +138,7 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
   <section id="performance" class="showcase">
     <h2 class="centered">왜 빠른가.</h2>
     <p class="sub centered">속도는 우연이 아니라 설계입니다. 전부 실측한 수치입니다.</p>
-    <table class="perf-table">
+    <div class="perf-wrap"><table class="perf-table">
       <thead><tr><th>측정 항목</th><th>결과</th><th>비고</th></tr></thead>
       <tbody>
         <tr><td>26,549개 폴더 벌크 읽기</td><td class="num">23.8 ms</td><td>getattrlistbulk — 옛 Foundation 풀 stat(1,084ms) 대비 <strong>46×</strong></td></tr>
@@ -149,7 +149,7 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
         <tr><td>디렉토리 150,696개 소크</td><td class="num">실패 0</td><td>실제 홈 트리 전체를 읽기+정렬 경로로 순회, kr 외 전부 &lt;55ms</td></tr>
         <tr><td>유휴 CPU</td><td class="num">~0 %</td><td>인덱스는 필요할 때만 갱신</td></tr>
       </tbody>
-    </table>
+    </table></div>
     <p class="perf-caption">Apple M4 Pro · macOS 26 기준. 측정 하니스·기준선·재현 방법은
       <a href="https://github.com/rescenedev/anf/blob/main/PERFORMANCE.md" target="_blank" rel="noopener">PERFORMANCE.md</a>와
       <a href="https://github.com/rescenedev/anf/blob/main/TESTING.md" target="_blank" rel="noopener">TESTING.md</a>에 공개되어 있습니다.</p>
