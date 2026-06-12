@@ -37,6 +37,21 @@ struct FileItem: Identifiable, Hashable, Sendable {
     /// (tar.gz / tar.bz2 / tar.xz / tgz) are matched on the full suffix.
     var isArchive: Bool { ArchiveService.kind(for: url) != nil }
 
+    /// Markdown gets its own rendered preview (headers, lists, code blocks) —
+    /// checked BEFORE isPlainTextLike, which also matches .md as plain text.
+    var isMarkdown: Bool { ["md", "markdown", "mdown", "mkd"].contains(ext) }
+
+    /// Compiled/opaque binaries Quick Look can't render anything useful for —
+    /// it still grinds through the file just to draw a "?" page. The inspector
+    /// shows an instant lightweight placeholder instead, so arrowing past a
+    /// 15MB .so never stalls.
+    var isOpaqueBinary: Bool {
+        if ["so", "dylib", "a", "o", "bin", "dat", "class", "pyc", "wasm",
+            "dill", "node"].contains(ext) { return true }
+        guard let t = contentType else { return false }
+        return t.conforms(to: .unixExecutable) && !isDirectory
+    }
+
     /// Scripts/source/plain text — previewed with our own readable text view
     /// (Quick Look renders these tiny). Rich text formats stay on Quick Look.
     var isPlainTextLike: Bool {

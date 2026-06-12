@@ -43,6 +43,7 @@ runVaultTests()
 runArchiveTests()
 MainActor.assumeIsolated { runWorkspacePinTests() }
 runQLPreviewSelectionTests()
+MainActor.assumeIsolated { runInspectorTests() }
 
 print("")
 if T.failures.isEmpty {

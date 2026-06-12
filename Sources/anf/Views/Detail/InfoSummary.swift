@@ -75,6 +75,26 @@ private struct RemotePreviewPlaceholder: View {
     }
 }
 
+/// Instant placeholder for opaque binaries (.so / .dylib / unix executables):
+/// Quick Look would grind through megabytes just to draw a "?" page, which
+/// stalled arrowing past them with the inspector open.
+private struct BinaryPreviewPlaceholder: View {
+    let item: FileItem
+    var body: some View {
+        VStack(spacing: 12) {
+            IconImage(image: IconProvider.shared.icon(for: item))
+                .frame(width: 64, height: 64)
+            Text(item.name).font(.system(size: 13, weight: .medium))
+                .lineLimit(2).multilineTextAlignment(.center)
+            Text("\(Format.bytes(item.size)) · \(Format.kind(item))")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+            Text(L("No preview for this format", "미리보기를 제공하지 않는 형식입니다"))
+                .font(.system(size: 11)).foregroundStyle(.tertiary)
+        }
+        .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 /// Right-hand inspector: a full-bleed preview of the selection. The metadata
 /// block stays hidden until the ⓘ button toggles it in.
 struct InfoInspector: View {
@@ -95,8 +115,12 @@ struct InfoInspector: View {
                 Group {
                     if target.url.scheme == "sftp" {
                         RemotePreviewPlaceholder(item: target)
+                    } else if target.isOpaqueBinary {
+                        BinaryPreviewPlaceholder(item: target)
                     } else if target.isExtractableDocument {
                         DocumentTextPreview(url: target.url, fontSize: workspace.previewTextSize)
+                    } else if target.isMarkdown {
+                        MarkdownPreview(url: target.url, fontSize: workspace.previewTextSize)
                     } else if target.isPlainTextLike {
                         TextFilePreview(url: target.url, fontSize: workspace.previewTextSize)
                     } else {

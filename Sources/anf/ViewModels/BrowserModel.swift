@@ -148,8 +148,16 @@ final class BrowserModel: Identifiable {
     }
 
     var selectedItems: [FileItem] {
+        // ALWAYS read the observable inputs BEFORE the cache check: with
+        // @Observable, a SwiftUI body only re-renders if it READ the property.
+        // Returning the memo on a warm cache skipped `selection`, so whichever
+        // view evaluated after another reader warmed the cache registered no
+        // dependency at all and went permanently stale (the inspector stopped
+        // following arrow-key selection — issue report 2026-06-13).
+        let sel = selection
+        _ = itemsVersion
         if let cached = selectedItemsCache { return cached }
-        let computed = selection.isEmpty ? [] : items.filter { selection.contains($0.id) }
+        let computed = sel.isEmpty ? [] : items.filter { sel.contains($0.id) }
         selectedItemsCache = computed
         return computed
     }
