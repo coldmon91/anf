@@ -58,11 +58,9 @@ struct IconGridView: NSViewRepresentable {
     final class Coordinator: NSObject, NSCollectionViewDataSource, NSCollectionViewDelegateFlowLayout {
         var model: BrowserModel
         weak var collection: NSCollectionView?
-        private var lastVersion = -1
+        private let syncState = ListSyncState()
         private var lastIconSize: Double = 0
-        private var lastAppliedSelection: Set<FileItem.ID>?
         private var lastEditingID: FileItem.ID?
-        private var syncingSelection = false
 
         init(model: BrowserModel) { self.model = model }
 
@@ -81,10 +79,9 @@ struct IconGridView: NSViewRepresentable {
                     layout.itemSize = Self.itemSize(icon: model.iconSize)
                     layout.invalidateLayout()
                 }
-                lastVersion = -1   // re-make cells at the new size
+                syncState.invalidateItems()   // re-make cells at the new size
             }
-            if lastVersion != model.itemsVersion {
-                lastVersion = model.itemsVersion
+            if syncState.itemsChanged(version: model.itemsVersion) {
                 cv.reloadData()
                 applySelection(cv, force: true, scroll: false)
             } else {
@@ -106,16 +103,15 @@ struct IconGridView: NSViewRepresentable {
         }
 
         private func applySelection(_ cv: NSCollectionView, force: Bool = false, scroll: Bool) {
-            if !force, lastAppliedSelection == model.selection { return }
-            lastAppliedSelection = model.selection
+            guard syncState.selectionChanged(model.selection, force: force) else { return }
             let want = Set(model.selection.compactMap { id in
                 model.index(of: id).map { IndexPath(item: $0, section: 0) }
             })
             guard want != cv.selectionIndexPaths else { return }
-            syncingSelection = true
-            cv.deselectItems(at: cv.selectionIndexPaths)
-            cv.selectItems(at: want, scrollPosition: [])
-            syncingSelection = false
+            syncState.applying {
+                cv.deselectItems(at: cv.selectionIndexPaths)
+                cv.selectItems(at: want, scrollPosition: [])
+            }
             if scroll, let first = want.min(by: { $0.item < $1.item }) {
                 cv.scrollToItems(at: [first], scrollPosition: .nearestHorizontalEdge)
             }
@@ -176,11 +172,11 @@ struct IconGridView: NSViewRepresentable {
         }
 
         private func pushSelection(_ cv: NSCollectionView) {
-            guard !syncingSelection else { return }
+            guard !syncState.isSyncing else { return }
             let ids = Set(cv.selectionIndexPaths.compactMap {
                 $0.item < items.count ? items[$0.item].id : nil
             })
-            lastAppliedSelection = ids
+            syncState.recordApplied(ids)
             if ids != model.selection { model.selection = ids }
         }
 

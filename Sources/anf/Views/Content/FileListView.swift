@@ -70,10 +70,9 @@ struct FileListView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate {
         var model: BrowserModel
         weak var table: NSTableView?
-        private var lastVersion = -1
+        private let syncState = ListSyncState()
         private var lastScale = 1.0
         private var lastEditingID: FileItem.ID?
-        private var syncingSelection = false
 
         init(model: BrowserModel) { self.model = model }
 
@@ -93,11 +92,10 @@ struct FileListView: NSViewRepresentable {
             if lastScale != model.textScale {
                 lastScale = model.textScale
                 applyRowHeight()
-                lastVersion = -1   // force a reload so fonts repaint
+                syncState.invalidateItems()   // force a reload so fonts repaint
                 lastIDs = []
             }
-            if lastVersion != model.itemsVersion {
-                lastVersion = model.itemsVersion
+            if syncState.itemsChanged(version: model.itemsVersion) {
                 applyListDiff(to: table)
                 // Items changed → row indices may have shifted; re-map even if the
                 // selection set itself is identical.
@@ -157,19 +155,15 @@ struct FileListView: NSViewRepresentable {
                 columnIndexes: IndexSet(integersIn: 0 ..< table.numberOfColumns))
         }
 
-        /// Last selection we reconciled, so the O(n) row scan below is skipped on
-        /// the (frequent) updateNSView ticks where the selection didn't change.
-        private var lastAppliedSelection: Set<FileItem.ID>?
 
         private func applyModelSelection(scroll: Bool, force: Bool = false) {
             guard let table else { return }
-            if !force, lastAppliedSelection == model.selection { return }
-            lastAppliedSelection = model.selection
+            guard syncState.selectionChanged(model.selection, force: force) else { return }
             let want = IndexSet(model.selection.compactMap { model.index(of: $0) })
             if want != table.selectedRowIndexes {
-                syncingSelection = true
-                table.selectRowIndexes(want, byExtendingSelection: false)
-                syncingSelection = false
+                syncState.applying {
+                    table.selectRowIndexes(want, byExtendingSelection: false)
+                }
                 if scroll, let first = want.first { table.scrollRowToVisible(first) }
             }
         }
@@ -233,9 +227,10 @@ struct FileListView: NSViewRepresentable {
         // MARK: Selection
 
         func tableViewSelectionDidChange(_ notification: Notification) {
-            guard !syncingSelection, let table else { return }
+            guard !syncState.isSyncing, let table else { return }
             let ids = table.selectedRowIndexes.compactMap { $0 < items.count ? items[$0].id : nil }
             let newSel = Set(ids)
+            syncState.recordApplied(newSel)
             if newSel != model.selection { model.selection = newSel }
         }
 
