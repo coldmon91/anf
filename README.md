@@ -104,6 +104,11 @@ brew install --cask postmelee/tap/alhangeul   # HWP/HWPX 미리보기
 
 ## 단축키
 
+> **사용자화 (⌘,)** — 설정 UI 없이 Ghostty 방식입니다. `⌘,`를 누르면
+> `~/.config/anf/keybindings.json`이 열리는데, **현재 기본 단축키 전부가 미리
+> 기입돼** 있어 원하는 줄만 고치면 됩니다. 저장 후 anf로 돌아오면 즉시 적용.
+> 한 액션에 여러 키(JSON 배열)도 되고, 다른 액션이 쓰던 키를 적으면 가져옵니다.
+
 ### 탐색
 | 키 | 동작 |
 |----|------|

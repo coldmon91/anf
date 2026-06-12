@@ -41,6 +41,33 @@ struct FileItem: Identifiable, Hashable, Sendable {
     /// checked BEFORE isPlainTextLike, which also matches .md as plain text.
     var isMarkdown: Bool { ["md", "markdown", "mdown", "mkd"].contains(ext) }
 
+    /// JSON gets jq-style pretty-printed + colorized preview — checked BEFORE
+    /// isPlainTextLike, which also matches .json as plain text.
+    var isJSON: Bool { ext == "json" || contentType?.conforms(to: .json) == true }
+
+    /// Types Quick Look renders something genuinely useful for. Anything else
+    /// that reaches the inspector's fallback gets content-sniffed: text shows in
+    /// the text preview, binary shows an instant placeholder — QL never grinds
+    /// through an unreadable blob just to draw a "?" page.
+    var isQuickLookFriendly: Bool {
+        if isDirectory { return true }
+        guard let t = contentType else { return false }
+        return t.conforms(to: .image) || t.conforms(to: .movie)
+            || t.conforms(to: .audiovisualContent) || t.conforms(to: .pdf)
+            || t.conforms(to: .rtf) || t.conforms(to: .html)
+            || t.conforms(to: .presentation) || t.conforms(to: .spreadsheet)
+            || t.conforms(to: .archive) || t.conforms(to: .font)
+    }
+
+    /// Content sniff for the unknown-type fallback: a NUL byte in the head is
+    /// the classic "this is binary" signal (same heuristic git uses).
+    nonisolated static func looksBinary(_ url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url),
+              let head = try? handle.read(upToCount: 8192) else { return false }
+        try? handle.close()
+        return head.contains(0)
+    }
+
     /// Compiled/opaque binaries Quick Look can't render anything useful for —
     /// it still grinds through the file just to draw a "?" page. The inspector
     /// shows an instant lightweight placeholder instead, so arrowing past a

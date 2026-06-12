@@ -56,8 +56,11 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
     /// Returns true if the event was consumed.
     private func handle(_ e: NSEvent) -> Bool {
         let flagsAll = e.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        // ⌃` toggles the terminal even while it's focused.
-        if flagsAll == .control && e.keyCode == 50 { workspace.toggleTerminal(); return true }
+        let token = Keymap.token(keyCode: e.keyCode, fallback: e.charactersIgnoringModifiers)
+        let bound = Keymap.shared.action(flags: flagsAll, key: token)
+        // The terminal toggle works even while the terminal is focused (its
+        // factory chord ⌃` did; a rebound chord keeps that property).
+        if bound == .toggleTerminal { workspace.toggleTerminal(); return true }
         // ⌘+/- adjusts terminal font size even while terminal is focused.
         if isTerminalFocused {
             let tFlags = e.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -69,6 +72,10 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
             return false
         }
         if isEditingText { return false }
+        // Keymap-driven actions (defaults pre-filled in keybindings.json; ⌘,
+        // opens it). Everything bindable dispatches here; the hardcoded
+        // shortcuts below are the non-bindable navigation/system set.
+        if let bound { return dispatch(bound) }
 
         let flags = e.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let cmd = flags.contains(.command)
@@ -91,11 +98,10 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
         // gallery filmstrip (a single horizontal row) and in list/columns.
         let gridStep = model.viewMode == .icons ? max(1, model.gridColumns) : 1
 
-        // --- No-modifier keys (orthodox navigation) ---
+        // --- No-modifier keys (orthodox navigation; not remappable) ---
+        // space/return/delete/F5/F6 moved to the keymap dispatch above.
         if !cmd && !opt {
             switch code {
-            case 49: toggleQuickLook(); return true                 // space
-            case 36, 76: model.beginRename(); return true           // return / enter → inline rename
             case 48: workspace.cyclePane(shift ? -1 : 1); return true // Tab → switch pane
             case 125:   // ↓ — icon/gallery grids jump a whole row
                 moveSel(by: gridStep, extend: shift); return true
@@ -114,7 +120,6 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
                     moveSel(by: 1, extend: shift); return true
                 }
                 return false
-            case 51:  model.trashSelection(); return true           // delete → trash
             // PgUp/PgDn move the SELECTION a viewport's worth (Explorer-style —
             // works even when there's nothing to scroll); Home/End jump it to
             // the first/last item. The views scroll to follow the selection.
@@ -122,8 +127,6 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
             case 121: moveSel(by: pageRows(), extend: shift); return true
             case 115: moveSel(by: -model.items.count, extend: shift); return true
             case 119: moveSel(by: model.items.count, extend: shift); return true
-            case 96:  workspace.transferToOtherPane(move: false); return true // F5 copy
-            case 97:  workspace.transferToOtherPane(move: true); return true   // F6 move
             case 53:  if QLPreviewPanel.sharedPreviewPanelExists() { QLPreviewPanel.shared().orderOut(nil); return true } // esc
             default: break
             }
@@ -140,26 +143,14 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
             }
         }
 
-        // --- Command combinations ---
+        // --- Command combinations (non-bindable system set) ---
+        // Everything bindable (tabs, layouts, navigation, toggles…) went
+        // through the keymap dispatch at the top.
         if cmd {
             if opt {
-                // ⌘⌥C copies the selection's path; ⌥⇧⌘C the current folder's.
-                if chars == "c" {
-                    shift ? model.copyCurrentFolderPath() : model.copyPathToPasteboard()
-                    return true
-                }
-                if chars == "i" { model.showGetInfo(); return true }   // ⌘⌥I → Get Info
                 // Tab selection ⌘⌥1…⌘⌥9
                 if let n = Int(chars), (1...9).contains(n) {
                     workspace.activePaneModel.select(n - 1); return true
-                }
-            }
-            // ⌘1–4 → pane layout (single / dual / rows / quad).
-            if !opt {
-                let digit: Int? = [18: 1, 19: 2, 20: 3, 21: 4][Int(code)]
-                if let d = digit {
-                    workspace.setLayout([.single, .dual, .rows, .quad][d - 1])
-                    return true
                 }
             }
             switch chars {
@@ -170,50 +161,60 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
                 if did { workspace.panes.prefix(workspace.layout.count).forEach { $0.current.reload() } }
                 else { NSSound.beep() }
                 return true
-            case "t": workspace.activePaneModel.newTab(); return true
-            case "w":
-                // Close the current tab → pane → window (Finder/browser order).
-                let pane = workspace.activePaneModel
-                if pane.tabs.count > 1 { pane.closeCurrent() }
-                else if workspace.layout.count > 1 { workspace.closeActivePane() }
-                else { NSApp.keyWindow?.performClose(nil) }   // last tab+pane → close window
-                return true
             case "=", "+": bumpScale(1); return true
             case "-": bumpScale(-1); return true
             case "c": model.copySelectionToPasteboard(); return true
             case "x": model.cutSelectionToPasteboard(); return true
             case "v": model.pasteFromPasteboard(); return true
             case "a": model.selectAll(); return true
-            case "i": workspace.inspectorVisible.toggle(); return true
-            case "/": workspace.pathBarVisible.toggle(); workspace.save(); return true
-            case "d": shift ? workspace.toggleFavoriteCurrent() : model.duplicateSelection(); return true
-            case "l": model.goToFolderPrompt(); return true
-            case "p": palette?.toggle(); return true
-            case "k": palette?.toggle(); return true   // ⌘K command palette
-            case "g": if shift { model.goToFolderPrompt(); return true }
-            case "n": if shift { model.makeNewFolder(); return true }
-            case "r": model.reload(); return true
-            default: break
-            }
-            switch code {
-            case 47:  // ⌘⇧. — toggle hidden files (Finder parity)
-                if shift { model.showHidden.toggle(); return true }
-                return false
-            case 123: model.goBack(); refocusContent(); return true     // ⌘← history back
-            case 124: model.goForward(); refocusContent(); return true  // ⌘→ history forward
-            case 125: model.openSelected(); return true   // ⌘↓ open
-            case 126: model.goUp(); refocusContent(); return true // ⌘↑ enclosing folder
-            case 51:  model.trashSelection(); return true // ⌘⌫ trash
-            case 33:  // [ — ⌘[ view mode back, ⌘⇧[ toggle LEFT sidebar
-                if shift { toggleLeftSidebar() } else { cycleViewMode(-1) }
-                return true
-            case 30:  // ] — ⌘] view mode forward, ⌘⇧] toggle RIGHT sidebar (inspector)
-                if shift { workspace.inspectorVisible.toggle() } else { cycleViewMode(1) }
-                return true
             default: break
             }
         }
         return false
+    }
+
+    /// Execute one keymap-driven action. Always consumes the event.
+    private func dispatch(_ action: KeyAction) -> Bool {
+        switch action {
+        case .newTab: workspace.activePaneModel.newTab()
+        case .closeTab:
+            // Close the current tab → pane → window (Finder/browser order).
+            let pane = workspace.activePaneModel
+            if pane.tabs.count > 1 { pane.closeCurrent() }
+            else if workspace.layout.count > 1 { workspace.closeActivePane() }
+            else { NSApp.keyWindow?.performClose(nil) }
+        case .commandPalette: palette?.toggle()
+        case .toggleTerminal: workspace.toggleTerminal()
+        case .layoutSingle: workspace.setLayout(.single)
+        case .layoutDual: workspace.setLayout(.dual)
+        case .layoutRows: workspace.setLayout(.rows)
+        case .layoutQuad: workspace.setLayout(.quad)
+        case .viewModePrev: cycleViewMode(-1)
+        case .viewModeNext: cycleViewMode(1)
+        case .toggleSidebar: toggleLeftSidebar()
+        case .toggleInspector: workspace.inspectorVisible.toggle()
+        case .togglePathBar: workspace.pathBarVisible.toggle(); workspace.save()
+        case .getInfo: model.showGetInfo()
+        case .duplicate: model.duplicateSelection()
+        case .toggleFavorite: workspace.toggleFavoriteCurrent()
+        case .goToFolder: model.goToFolderPrompt()
+        case .newFolder: model.makeNewFolder()
+        case .reload: model.reload()
+        case .toggleHidden: model.showHidden.toggle()
+        case .goBack: model.goBack(); refocusContent()
+        case .goForward: model.goForward(); refocusContent()
+        case .goUp: model.goUp(); refocusContent()
+        case .openSelected: model.openSelected()
+        case .copyPath: model.copyPathToPasteboard()
+        case .copyFolderPath: model.copyCurrentFolderPath()
+        case .transferCopy: workspace.transferToOtherPane(move: false)
+        case .transferMove: workspace.transferToOtherPane(move: true)
+        case .quickLook: toggleQuickLook()
+        case .rename: model.beginRename()
+        case .trash: model.trashSelection()
+        case .openSettings: Keymap.openSettingsFile()
+        }
+        return true
     }
 
     /// Items per PgUp/PgDn step: one viewport's worth of rows in the current

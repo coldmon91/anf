@@ -95,6 +95,31 @@ private struct BinaryPreviewPlaceholder: View {
     }
 }
 
+/// Fallback for types nothing else claimed: sniff the head of the file — real
+/// text renders in the text preview, anything binary skips Quick Look entirely
+/// and shows the instant placeholder.
+private struct SniffedPreview: View {
+    let item: FileItem
+    let fontSize: CGFloat
+    @State private var binary: Bool?
+
+    var body: some View {
+        Group {
+            switch binary {
+            case .some(true): BinaryPreviewPlaceholder(item: item)
+            case .some(false): TextFilePreview(url: item.url, fontSize: fontSize)
+            case .none: Color.clear   // sniffing takes ~a syscall; no spinner needed
+            }
+        }
+        .task(id: item.url) {
+            let url = item.url
+            binary = await Task.detached(priority: .userInitiated) {
+                FileItem.looksBinary(url)
+            }.value
+        }
+    }
+}
+
 /// Right-hand inspector: a full-bleed preview of the selection. The metadata
 /// block stays hidden until the ⓘ button toggles it in.
 struct InfoInspector: View {
@@ -121,10 +146,16 @@ struct InfoInspector: View {
                         DocumentTextPreview(url: target.url, fontSize: workspace.previewTextSize)
                     } else if target.isMarkdown {
                         MarkdownPreview(url: target.url, fontSize: workspace.previewTextSize)
+                    } else if target.isJSON {
+                        JSONPreview(url: target.url, fontSize: workspace.previewTextSize)
                     } else if target.isPlainTextLike {
                         TextFilePreview(url: target.url, fontSize: workspace.previewTextSize)
-                    } else {
+                    } else if target.isQuickLookFriendly {
                         QuickLookView(url: target.url)
+                    } else {
+                        // Unknown type: sniff the content — text shows as text,
+                        // binary skips QL entirely (instant placeholder).
+                        SniffedPreview(item: target, fontSize: workspace.previewTextSize)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

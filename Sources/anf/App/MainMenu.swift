@@ -37,6 +37,12 @@ final class ViewMenuController: NSObject, NSMenuItemValidation {
 
 /// Minimal native menu bar. Standard editing selectors keep text fields (filter,
 /// rename) fully functional; the App/Window menus give Quit, Hide and zoom.
+/// Target for the ⌘, settings menu item (menus need an object target).
+final class SettingsMenuTarget: NSObject {
+    @MainActor static let shared = SettingsMenuTarget()
+    @MainActor @objc func openSettings(_ sender: Any?) { Keymap.openSettingsFile() }
+}
+
 enum MainMenu {
     static func install() {
         let main = NSMenu()
@@ -48,6 +54,13 @@ enum MainMenu {
         appItem.submenu = appMenu
         let about = appMenu.addItem(withTitle: L("About anf", "anf에 관하여"), action: #selector(AboutController.show(_:)), keyEquivalent: "")
         about.target = AboutController.shared
+        appMenu.addItem(.separator())
+        // ⌘, the Ghostty way: no settings window — opens keybindings.json,
+        // pre-filled with every current default binding.
+        let settings = appMenu.addItem(withTitle: L("Settings (Keybindings)…", "설정 (단축키)…"),
+                                       action: #selector(SettingsMenuTarget.openSettings(_:)),
+                                       keyEquivalent: ",")
+        settings.target = SettingsMenuTarget.shared
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: L("Hide anf", "anf 가리기"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = appMenu.addItem(withTitle: L("Hide Others", "기타 가리기"), action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")

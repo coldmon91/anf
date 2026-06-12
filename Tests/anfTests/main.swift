@@ -44,6 +44,7 @@ runArchiveTests()
 MainActor.assumeIsolated { runWorkspacePinTests() }
 runQLPreviewSelectionTests()
 MainActor.assumeIsolated { runInspectorTests() }
+runKeymapTests()
 
 print("")
 if T.failures.isEmpty {

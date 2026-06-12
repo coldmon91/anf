@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 @testable import anf
 
@@ -40,6 +41,22 @@ func runInspectorTests() {
             T.expect(make("a.md")?.isMarkdown == true, ".md → markdown preview")
             T.expect(make("b.markdown")?.isMarkdown == true, ".markdown → markdown preview")
             T.expect(make("c.txt")?.isMarkdown == false, ".txt stays plain text")
+        }
+
+        T.group("JSONPretty") {
+            let pretty = JSONPretty.prettyString(Data(#"{"b":1,"a":{"k":[true,null,"s"]}}"#.utf8))
+            T.expect(pretty?.contains("\n") == true, "re-indents")
+            T.expect(pretty?.contains("\"a\"") == true, "keys survive")
+            T.expect(JSONPretty.prettyString(Data("not json".utf8)) == nil, "invalid → nil (text fallback)")
+            if let pretty {
+                let rich = JSONPretty.highlight(pretty, fontSize: 12)
+                T.equal(rich.length, (pretty as NSString).length, "highlight keeps full text")
+                var colors = Set<NSColor>()
+                rich.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: rich.length)) { v, _, _ in
+                    if let c = v as? NSColor { colors.insert(c) }
+                }
+                T.expect(colors.count >= 3, "keys/strings/numbers colored distinctly (got \(colors.count))")
+            }
         }
 
         T.group("MarkdownBlocks.parse") {
