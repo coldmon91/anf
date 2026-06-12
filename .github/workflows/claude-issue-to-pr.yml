@@ -30,12 +30,19 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          show_full_output: true   # 디버그: 실행 내역을 로그에 남긴다 (공개 저장소 주의)
+          show_full_output: true   # 실행 내역을 로그에 남긴다 (디버깅 즉시 가능)
           additional_permissions: |
             actions: read
+          # 기본 허용 목록에 gh issue/pr 가 없어 이슈 본문 읽기부터 거부됐다 —
+          # 이 자동화가 실제로 쓰는 도구를 명시적으로 허용한다.
+          claude_args: |
+            --allowedTools "Bash(git:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh release:*),Bash(swift:*),Bash(python3:*),Bash(./build.sh:*),Bash(ls:*),Bash(cat:*),Bash(grep:*),Bash(find:*)"
           prompt: |
             GitHub 이슈 #${{ github.event.issue.number }} 를 해결하세요.
             제목: ${{ github.event.issue.title }}
+
+            본문:
+            ${{ github.event.issue.body }}
 
             이 저장소의 규칙 (CLAUDE.md · TESTING.md · METHODOLOGY.md 참고):
             - 모든 버그 수정에는 그 시나리오를 재현하는 회귀 테스트를 함께
