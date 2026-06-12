@@ -89,13 +89,11 @@ struct DocumentTextPreview: View {
                     Text(L("Extracting text…", "본문 추출 중…")).font(.system(size: 11)).foregroundStyle(.secondary)
                 }
             } else if let text, !text.isEmpty {
-                ScrollView {
-                    Text(text)
-                        .font(.system(size: fontSize))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
-                }
+                // TextKit, not one big SwiftUI Text: Text lays out the WHOLE
+                // body before painting, which hitched the arrow keys on long
+                // documents (same fix as the json/plain-text previews).
+                PlainTextScrollView(text: text, fontSize: fontSize)
+                    .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
             } else {
                 VStack(spacing: 6) {
                     Image(systemName: "doc.text").font(.system(size: 26)).foregroundStyle(.tertiary)
