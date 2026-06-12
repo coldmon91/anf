@@ -49,8 +49,29 @@ async function webhook(req, env) {
       (c.body ?? "").slice(0, 300),
       c.html_url,
     ].join("\n"));
+  } else if (event === "release" && p.action === "published") {
+    const r = p.release;
+    await tg(env, [
+      `🚀 릴리즈 ${r.tag_name}${r.name && r.name !== r.tag_name ? ` — ${r.name}` : ""}`,
+      summarizeNotes(r.body ?? ""),
+      r.html_url,
+    ].filter(Boolean).join("\n\n"));
   }
   return new Response("ok");
+}
+
+// Release notes → a plain-text digest Telegram renders well: drop markdown
+// noise (headers/links/code fences), keep the substance, cap the length.
+function summarizeNotes(body) {
+  const text = body
+    .replace(/```[\s\S]*?```/g, "")          // code fences (install commands etc.)
+    .replace(/^#+\s*/gm, "")                  // heading markers
+    .replace(/\*\*([^*]+)\*\*/g, "$1")        // bold
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")  // links → text
+    .replace(/^\s*[-*]\s+/gm, "• ")           // bullets
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text.length > 900 ? text.slice(0, 900) + "…" : text;
 }
 
 async function validSignature(secret, body, header) {
