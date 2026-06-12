@@ -146,6 +146,7 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
         <tr><td>Revisit the same folder</td><td class="num">0 ms</td><td>cached listing paints first, changes reconcile behind it</td></tr>
         <tr><td>Sort 26,549 Korean names</td><td class="num">98 ms</td><td>packed-integer comparison — 5× over locale compare (480ms)</td></tr>
         <tr><td>Content-search sweep over 32 PDFs</td><td class="num">410 ms → 4 ms</td><td>extracted once per session, then cached per keystroke</td></tr>
+        <tr><td>Copy a 55,860-entry (622MB) folder</td><td class="num">6.8 s</td><td>parallel APFS clones — faster than cp -Rc (8.4s), fully background with progress + instant cancel</td></tr>
         <tr><td>Soak across 150,696 directories</td><td class="num">0 failures</td><td>a real home tree through the production read+sort path, all &lt;55ms except the 26k outlier</td></tr>
         <tr><td>Idle CPU</td><td class="num">~0 %</td><td>the index refreshes only when needed</td></tr>
       </tbody>
@@ -365,6 +366,7 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
           <ul>
             <li><strong>⌘Z / ⌘⇧Z</strong> — undo/redo moves, renames, trashing and new folders</li>
             <li>Name conflicts offer keep-both / overwrite / skip; large operations get a progress HUD with cancel</li>
+            <li>Large copies run fully in the background — progress HUD with mid-tree cancel; small jobs finish silently</li>
             <li>zip compress/extract, empty Trash, eject disks, hidden files via ⌘⇧., drag &amp; drop</li>
             <li>Inline rename (extension auto-excluded), batch rename for multiple items</li>
           </ul>
