@@ -882,20 +882,21 @@ enum PaletteSearch {
         return lines.map { URL(fileURLWithPath: $0) }
     }
 
-    // MARK: - Document body search (hwpx / docx / pptx / xlsx)
+    // MARK: - Document body search (hwpx / docx / pptx / xlsx / pdf)
 
-    /// ripgrep treats these as binary (they're ZIP+XML), so search their bodies
-    /// by unzipping each to stdout and matching in Swift. Matching is done in
-    /// Swift (not piped to `grep`) for two reasons: Swift string comparison is
-    /// Unicode-canonical, so it's immune to NFC/NFD differences between IME input
-    /// and document text; and it avoids depending on a `grep` that may be shadowed
-    /// or misconfigured in the app's spawn environment. Bounded by file count +
-    /// per-file timeout so it stays fast.
+    /// ripgrep treats these as binary (ZIP+XML — or PDF), so search their
+    /// bodies via DocumentText (unzip for office files, PDFKit for PDFs) and
+    /// match in Swift. Matching is done in Swift (not piped to `grep`) for two
+    /// reasons: Swift string comparison is Unicode-canonical, so it's immune to
+    /// NFC/NFD differences between IME input and document text; and it avoids
+    /// depending on a `grep` that may be shadowed or misconfigured in the app's
+    /// spawn environment. Bounded by file count + per-file page caps so it
+    /// stays fast.
     static func docContent(root: URL, needle: String, cap: Int) -> [URL] {
         guard let fd = ExternalTools.path("fd"),
               FileManager.default.isExecutableFile(atPath: "/usr/bin/unzip") else { return [] }
         var args = ["--color=never", "--absolute-path", "--type", "f"]
-        for ext in ["hwpx", "docx", "pptx", "xlsx"] { args += ["--extension", ext] }
+        for ext in ["hwpx", "docx", "pptx", "xlsx", "pdf"] { args += ["--extension", ext] }
         let scanLimit = 80
         args += ["--max-results", "\(scanLimit)", ".", root.path]
         let files = ExternalTools.run(fd, args, maxLines: scanLimit, timeout: 2.0)

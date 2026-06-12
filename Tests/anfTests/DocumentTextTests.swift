@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 @testable import anf
 
@@ -23,4 +24,33 @@ func runDocumentTextTests() {
         let ent = DocumentText.strip("<w:p>a &amp; b &lt;c&gt; &quot;d&quot;</w:p>")
         T.expect(ent.contains("a & b <c> \"d\""), "decodes entities")
     }
+
+    T.group("DocumentText: PDF body extraction") {
+        T.expect(DocumentText.canExtract("pdf"), "pdf is an extractable kind")
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anf-doc-\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard writeTestPDF(to: url, text: "anf 검색 테스트 hello PDF") else {
+            T.expect(false, "test PDF written"); return
+        }
+        let body = DocumentText.extract(url)
+        T.expect(body?.contains("hello PDF") == true, "extracts latin text from the PDF")
+        T.expect(body?.contains("검색 테스트") == true, "extracts Korean text from the PDF")
+    }
+}
+
+/// Draws one page of text into a real PDF via Core Graphics + Core Text.
+private func writeTestPDF(to url: URL, text: String) -> Bool {
+    var box = CGRect(x: 0, y: 0, width: 400, height: 200)
+    guard let ctx = CGContext(url as CFURL, mediaBox: &box, nil) else { return false }
+    ctx.beginPDFPage(nil)
+    let attr = NSAttributedString(string: text, attributes: [
+        .font: NSFont.systemFont(ofSize: 16),
+    ])
+    let line = CTLineCreateWithAttributedString(attr)
+    ctx.textPosition = CGPoint(x: 20, y: 100)
+    CTLineDraw(line, ctx)
+    ctx.endPDFPage()
+    ctx.closePDF()
+    return true
 }

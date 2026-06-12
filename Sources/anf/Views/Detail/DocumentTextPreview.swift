@@ -1,15 +1,20 @@
 import SwiftUI
+import PDFKit
 
 /// Extracts plain text from ZIP+XML office documents (hwpx / docx / pptx / xlsx)
-/// by unzipping the text-bearing XML and stripping tags. No QuickLook generator
-/// (e.g. 알한글) required — just a readable text body.
+/// by unzipping the text-bearing XML and stripping tags, and from PDFs via
+/// PDFKit. No QuickLook generator (e.g. 알한글) required — just a readable body.
 enum DocumentText {
     static func canExtract(_ ext: String) -> Bool {
-        ["hwpx", "docx", "pptx", "xlsx"].contains(ext.lowercased())
+        ["hwpx", "docx", "pptx", "xlsx", "pdf"].contains(ext.lowercased())
     }
+
+    /// Pages to walk per PDF — bounds extraction time on thousand-page scans.
+    private static let pdfPageCap = 200
 
     static func extract(_ url: URL) -> String? {
         let ext = url.pathExtension.lowercased()
+        if ext == "pdf" { return extractPDF(url) }
         guard canExtract(ext),
               FileManager.default.isExecutableFile(atPath: "/usr/bin/unzip") else { return nil }
         let pattern: String
@@ -29,6 +34,17 @@ enum DocumentText {
 
     private static func shq(_ s: String) -> String {
         "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// PDFKit text layer (no OCR — image-only scans have no text to extract).
+    private static func extractPDF(_ url: URL) -> String? {
+        guard let doc = PDFDocument(url: url), !doc.isLocked else { return nil }
+        var parts: [String] = []
+        for i in 0 ..< min(doc.pageCount, pdfPageCap) {
+            if let s = doc.page(at: i)?.string, !s.isEmpty { parts.append(s) }
+        }
+        let joined = parts.joined(separator: "\n")
+        return joined.isEmpty ? nil : joined
     }
 
     /// Internal (not private) so unit tests can exercise tag/entity stripping.
