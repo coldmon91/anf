@@ -135,7 +135,14 @@ strong { color: var(--txt); font-weight: 600; }
   width: 100%; border-radius: var(--radius); border: 1px solid var(--line);
   box-shadow: 0 40px 100px rgba(0,0,0,.6);
 }
-.dots { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 26px; }
+/* Grid (not wrap) so the 4 layout buttons fall into even rows — 4, then 2+2,
+   then 1·1·1·1 — never an uneven 3+1 break. */
+.dots {
+  display: grid; grid-template-columns: repeat(4, auto);
+  gap: 10px; justify-content: center; margin-top: 26px;
+}
+@media (max-width: 720px) { .dots { grid-template-columns: repeat(2, auto); } }
+@media (max-width: 380px) { .dots { grid-template-columns: 1fr; } }
 .dot {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--tile); border: 1px solid var(--line); color: var(--txt-dim);
@@ -484,6 +491,16 @@ kbd {
 }
 .hero-dl:hover { filter: brightness(1.07); transform: translateY(-1px); }
 .hero-dl .dl-ic { font-size: 18px; }
+.hero-specs {
+  margin-top: 18px; font-size: 14px; color: var(--txt-faint);
+  letter-spacing: .01em;
+}
+.hero-specs strong {
+  color: var(--txt); font-weight: 700;
+  background: linear-gradient(90deg, #2997ff, #7c5cff 60%, #ff5ea8);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 .hero-btn {
   padding: 12px 22px; border-radius: 12px; font-weight: 600;
   border: 1px solid var(--line); color: var(--txt-dim); background: var(--tile);
