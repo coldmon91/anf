@@ -166,7 +166,7 @@ final class WorkspaceModel {
 
     static func loadPreviewTextSize() -> CGFloat {
         let stored = UserDefaults.standard.double(forKey: previewTextSizeKey)
-        return stored >= 9 && stored <= 28 ? CGFloat(stored) : 14
+        return stored >= 9 && stored <= 28 ? CGFloat(stored) : 16
     }
 
     func bumpPreviewTextSize(_ direction: Int) {

@@ -46,11 +46,11 @@ func runInspectorTests() {
         T.group("preview text size: defaults large, persists, clamps") {
             let key = "anf.previewTextSize"
             UserDefaults.standard.removeObject(forKey: key)
-            T.equal(WorkspaceModel.loadPreviewTextSize(), 14, "default is 14 — reading size")
+            T.equal(WorkspaceModel.loadPreviewTextSize(), 16, "default is 16 — reading size")
             UserDefaults.standard.set(18.0, forKey: key)
             T.equal(WorkspaceModel.loadPreviewTextSize(), 18, "⌘± choice survives relaunch")
             UserDefaults.standard.set(99.0, forKey: key)
-            T.equal(WorkspaceModel.loadPreviewTextSize(), 14, "out-of-range value falls back")
+            T.equal(WorkspaceModel.loadPreviewTextSize(), 16, "out-of-range value falls back")
             UserDefaults.standard.removeObject(forKey: key)
         }
 
