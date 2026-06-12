@@ -93,13 +93,13 @@ struct MarkdownPreview: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 7) {
+            LazyVStack(alignment: .leading, spacing: max(9, fontSize * 0.55)) {
                 ForEach(blocks) { block in
                     view(for: block)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
+            .padding(16)
         }
         .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
         .safeAreaInset(edge: .bottom) {
@@ -126,19 +126,34 @@ struct MarkdownPreview: View {
         }
     }
 
+    /// Inline-code chips: SwiftUI's Text honors inlinePresentationIntent for
+    /// bold/italic but draws `code` in the same body font — give code runs a
+    /// monospaced face and a subtle chip so code-dense docs stay readable.
+    private func inlineStyled(_ text: AttributedString, codeSize: CGFloat) -> AttributedString {
+        var t = text
+        for run in t.runs {
+            if let inline = run.inlinePresentationIntent, inline.contains(.code) {
+                t[run.range].font = .system(size: codeSize, design: .monospaced)
+                t[run.range].backgroundColor = Color.primary.opacity(0.09)
+            }
+        }
+        return t
+    }
+
     @ViewBuilder private func view(for block: MDBlock) -> some View {
         switch block.kind {
         case .header(let level):
-            let scale: CGFloat = [1.7, 1.45, 1.25, 1.12, 1.05, 1.0][level - 1]
-            Text(block.text)
+            let scale: CGFloat = [1.65, 1.4, 1.22, 1.1, 1.05, 1.0][level - 1]
+            Text(inlineStyled(block.text, codeSize: fontSize * scale - 1))
                 .font(.system(size: fontSize * scale, weight: .bold))
-                .padding(.top, level <= 2 ? 6 : 3)
+                .padding(.top, level <= 2 ? fontSize * 0.7 : fontSize * 0.3)
                 .textSelection(.enabled)
         case .codeBlock:
             Text(block.text)
                 .font(.system(size: fontSize - 1, design: .monospaced))
+                .lineSpacing(fontSize * 0.15)
                 .textSelection(.enabled)
-                .padding(8)
+                .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.primary.opacity(0.05),
                             in: RoundedRectangle(cornerRadius: 6, style: .continuous))
@@ -146,21 +161,31 @@ struct MarkdownPreview: View {
             HStack(alignment: .top, spacing: 8) {
                 RoundedRectangle(cornerRadius: 1.5).fill(Color.secondary.opacity(0.5))
                     .frame(width: 3)
-                Text(block.text)
+                Text(inlineStyled(block.text, codeSize: fontSize - 1))
                     .font(.system(size: fontSize))
+                    .lineSpacing(fontSize * 0.22)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
             }
         case .listItem(let prefix, let depth):
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(prefix).font(.system(size: fontSize)).foregroundStyle(.secondary)
-                Text(block.text).font(.system(size: fontSize)).textSelection(.enabled)
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text(prefix)
+                    .font(.system(size: fontSize, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: fontSize * 1.3, alignment: .leading)
+                Text(inlineStyled(block.text, codeSize: fontSize - 1))
+                    .font(.system(size: fontSize))
+                    .lineSpacing(fontSize * 0.22)
+                    .textSelection(.enabled)
             }
-            .padding(.leading, CGFloat(depth - 1) * 16)
+            .padding(.leading, CGFloat(depth - 1) * fontSize * 1.2)
         case .divider:
             Divider().padding(.vertical, 4)
         case .paragraph:
-            Text(block.text).font(.system(size: fontSize)).textSelection(.enabled)
+            Text(inlineStyled(block.text, codeSize: fontSize - 1))
+                .font(.system(size: fontSize))
+                .lineSpacing(fontSize * 0.22)
+                .textSelection(.enabled)
         }
     }
 }

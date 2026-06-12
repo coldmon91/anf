@@ -106,6 +106,22 @@ func runInspectorTests() {
                      "template pre-fills the setting")
         }
 
+        T.group("settings migration appends previewTextSize to old files") {
+            let f = dir.appendingPathComponent("old-template.json")
+            try? "{\n  \"newTab\": \"cmd+t\",\n  \"openSettings\": \"cmd+,\"\n}\n"
+                .write(to: f, atomically: true, encoding: .utf8)
+            Keymap.migrateMissingSettings(at: f)
+            let after = (try? String(contentsOf: f, encoding: .utf8)) ?? ""
+            let dict = (try? JSONSerialization.jsonObject(with: Data(after.utf8))) as? [String: Any]
+            T.expect(dict?["previewTextSize"] != nil, "key appended")
+            T.equal(dict?["newTab"] as? String, "cmd+t", "existing entries untouched")
+            T.expect(after.contains("\"openSettings\": \"cmd+,\","), "comma added after last entry")
+            // Already has the key → file untouched (idempotent).
+            let before2 = after
+            Keymap.migrateMissingSettings(at: f)
+            T.equal((try? String(contentsOf: f, encoding: .utf8)) ?? "", before2, "second run is a no-op")
+        }
+
         T.group("MarkdownBlocks.parse") {
             let src = """
             # Title

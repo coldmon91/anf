@@ -217,7 +217,31 @@ final class Keymap {
     /// ⌘, the Ghostty way: make sure the pre-filled file exists, then open it
     /// in the user's editor. Edits apply when anf becomes active again.
     static func openSettingsFile() {
-        NSWorkspace.shared.open(ensureFileExists())
+        let url = ensureFileExists()
+        migrateMissingSettings(at: url)
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Files created by older templates lack newer settings keys. Append them
+    /// TEXTUALLY (before the closing brace) so the user's formatting and edits
+    /// survive — re-serializing would mangle their hand-written file.
+    nonisolated static func migrateMissingSettings(at url: URL) {
+        guard let s = try? String(contentsOf: url, encoding: .utf8),
+              let data = s.data(using: .utf8),
+              let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              dict["previewTextSize"] == nil,
+              let brace = s.range(of: "}", options: .backwards) else { return }
+        let stored = UserDefaults.standard.double(forKey: "anf.previewTextSize")
+        let size = stored >= 9 && stored <= 28 ? Int(stored) : 16
+        // Splice right after the last meaningful character (consuming the
+        // whitespace run before the brace) so the result stays tidy.
+        let head = s[..<brace.lowerBound]
+        guard let lastIdx = head.lastIndex(where: { !" \n\t".contains($0) }) else { return }
+        let comma = (head[lastIdx] == "{" || head[lastIdx] == ",") ? "" : ","
+        var out = s
+        out.replaceSubrange(head.index(after: lastIdx)..<brace.lowerBound,
+                            with: "\(comma)\n  \"previewTextSize\": \(size)\n")
+        try? out.write(to: url, atomically: true, encoding: .utf8)
     }
 
     /// Create the keybindings file pre-filled with EVERY current default
