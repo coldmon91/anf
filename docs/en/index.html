@@ -525,6 +525,11 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
 </footer>
 
 <script>
+// Reload starts at the top (not wherever you last scrolled). In-page anchor
+// links like #install / #vault still jump correctly because they set a hash.
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+window.addEventListener('load', function () { if (!location.hash) window.scrollTo(0, 0); });
+
 (function () {
   var frames = [].slice.call(document.querySelectorAll('.car-frame'));
   var dots = [].slice.call(document.querySelectorAll('.dot'));
