@@ -13,3 +13,4 @@ anf.app/
 *.xcodeproj
 .swiftpm/
 Package.resolved
+drafts/
