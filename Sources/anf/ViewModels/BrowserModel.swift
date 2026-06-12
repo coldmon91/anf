@@ -468,6 +468,32 @@ final class BrowserModel: Identifiable {
         reload()
     }
 
+    // MARK: - Vault
+
+    /// Protect the current folder with a time-travel Vault.
+    func enableVault() {
+        let url = currentURL
+        VaultWatcher.shared.enable(url) { [weak self] ok in
+            if ok { self?.reload() }
+            else { FileOperations.presentFailures(
+                L("Couldn’t create Vault", "Vault를 만들지 못했습니다"),
+                [L("git is required and must be available.", "git이 필요합니다.")]) }
+        }
+    }
+
+    func confirmDisableVault() {
+        let alert = NSAlert()
+        alert.messageText = L("Turn off Vault for this folder?", "이 폴더의 Vault를 끌까요?")
+        alert.informativeText = L("Your files stay. The version history and protection are removed.",
+                                  "파일은 그대로 유지됩니다. 버전 히스토리와 보호만 제거됩니다.")
+        alert.addButton(withTitle: L("Turn Off", "끄기"))
+        alert.addButton(withTitle: L("Cancel", "취소"))
+        if alert.runModal() == .alertFirstButtonReturn {
+            VaultWatcher.shared.disable(currentURL)
+            reload()
+        }
+    }
+
     func revealSelection() {
         FileOperations.reveal(selectedItems.isEmpty ? [] : selectedItems)
     }

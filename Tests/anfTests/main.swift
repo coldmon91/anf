@@ -39,6 +39,7 @@ runTransferTests()
 runL10nTests()
 runThumbnailThrottleTests()
 runFileTagsTests()
+runVaultTests()
 
 print("")
 if T.failures.isEmpty {

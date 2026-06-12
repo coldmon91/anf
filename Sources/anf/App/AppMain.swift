@@ -85,6 +85,7 @@ public func anfMain() {
     // default delay (~1.5s) makes them feel absent, so shorten it app-wide.
     UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 500])
     HangWatchdog.startIfRequested()
+    _ = VaultWatcher.shared   // resume watching protected folders from last launch
     // Return allocator slack to the OS periodically: after a burst (26k listing,
     // bulk copy) malloc keeps freed pages dirty, which reads as a bloated
     // footprint in Activity Monitor even though the live heap is ~30MB.

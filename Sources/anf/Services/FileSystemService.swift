@@ -26,6 +26,13 @@ struct FileSystemService: Sendable {
     /// almost instantly. The full `contents(of:)` pass enriches it afterwards.
     func contentsFast(of url: URL, showHidden: Bool) async -> [FileItem] {
         await Task.detached(priority: .userInitiated) {
+            // In a vault, the .git store and .gitignore are anf's plumbing — drop
+            // them unconditionally (even with hidden files shown) so the user
+            // never sees that Git is running underneath.
+            let vault = VaultService.isVault(url)
+            @inline(__always) func vaultHidden(_ name: String) -> Bool {
+                vault && (name == ".git" || name == ".gitignore")
+            }
             // Native bulk read (no per-item stat). Falls back to FileManager only
             // if getattrlistbulk is unavailable for this volume.
             if let entries = FastDirRead.list(path: url.path) {
@@ -36,7 +43,7 @@ struct FileSystemService: Sendable {
                 out.withUnsafeMutableBufferPointer { buf in
                     DispatchQueue.concurrentPerform(iterations: entries.count) { i in
                         let e = entries[i]
-                        if showHidden || !e.isHidden {
+                        if (showHidden || !e.isHidden) && !vaultHidden(e.name) {
                             buf[i] = FileItem.fast(parentPath: parentPath, entry: e)
                         }
                     }
@@ -51,7 +58,9 @@ struct FileSystemService: Sendable {
                 includingPropertiesForKeys: Array(FileItem.fastKeys),
                 options: options
             ) else { return [] }
-            return urls.compactMap { FileItem(fastURL: $0) }
+            return urls.compactMap { u in
+                vaultHidden(u.lastPathComponent) ? nil : FileItem(fastURL: u)
+            }
         }.value
     }
 

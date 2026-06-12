@@ -90,6 +90,15 @@ enum FileItemMenu {
         add(L("New Folder", "새 폴더")) { model.makeNewFolder() }
         add(L("Open Terminal Here", "여기서 터미널 열기")) { FileOperations.openInTerminal(model.currentURL) }
         menu.addItem(.separator())
+        // Vault: time-travel protection for this folder.
+        if VaultWatcher.shared.isVault(model.currentURL) {
+            add(L("Vault Timeline…", "Vault 타임라인…")) { VaultTimelinePanel.show(for: model.currentURL) }
+            add(L("Snapshot Now", "지금 스냅샷")) { VaultWatcher.shared.snapshotNow(model.currentURL) }
+            add(L("Turn Off Vault…", "Vault 끄기…")) { model.confirmDisableVault() }
+        } else {
+            add(L("Protect with Vault…", "Vault로 보호하기…")) { model.enableVault() }
+        }
+        menu.addItem(.separator())
         add(L("Paste", "붙여넣기")) { model.pasteFromPasteboard() }
         add(L("Go to Folder…", "폴더로 이동…")) { model.goToFolderPrompt() }
         // Empty-space click = the folder itself, not the (auto-)selected row.
