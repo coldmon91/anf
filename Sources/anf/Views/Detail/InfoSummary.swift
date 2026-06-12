@@ -142,16 +142,15 @@ struct InfoInspector: View {
                         RemotePreviewPlaceholder(item: target)
                     } else if target.isOpaqueBinary {
                         BinaryPreviewPlaceholder(item: target)
-                    } else if target.ext == "hwpx" {
-                        // hwpx has no system Quick Look generator (needs 알한글) —
-                        // our extracted body text is the dependable preview.
-                        DocumentTextPreview(url: target.url, fontSize: workspace.previewTextSize)
+                    } else if target.ext == "docx" {
+                        // Native structured render (headings/tables/lists/bold)
+                        // parsed from the document XML — instant and full-width,
+                        // unlike Quick Look's paginated page image.
+                        DocxPreview(url: target.url, fontSize: workspace.previewTextSize)
                     } else if target.isExtractableDocument {
-                        // docx/pptx/xlsx: macOS Quick Look renders these RICHLY
-                        // (headings, tables, bold) with no Office installed —
-                        // strictly better than our tag-stripped text. Extraction
-                        // still powers ⌘K content search.
-                        QuickLookView(url: target.url)
+                        // hwpx/pptx/xlsx: extracted body text (hwpx has no system
+                        // QL generator; slides/sheets read fine as text).
+                        DocumentTextPreview(url: target.url, fontSize: workspace.previewTextSize)
                     } else if target.isMarkdown {
                         MarkdownPreview(url: target.url, fontSize: workspace.previewTextSize)
                     } else if target.isJSON {
