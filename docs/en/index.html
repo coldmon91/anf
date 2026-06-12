@@ -20,7 +20,7 @@
 <meta name="theme-color" content="#060607">
 <link rel="alternate" hreflang="ko" href="https://rescenedev.github.io/anf/">
 <link rel="alternate" hreflang="en" href="https://rescenedev.github.io/anf/en/">
-<link rel="stylesheet" href="../styles.css?v=13">
+<link rel="stylesheet" href="../styles.css?v=14">
 </head>
 <body>
 
@@ -68,19 +68,29 @@
   <section id="install" class="band">
     <div class="band-inner">
       <h2 class="centered">Install.</h2>
-      <p class="sub centered">One Homebrew command. Apple Silicon recommended.</p>
-      <div class="install-box">
-        <div class="cmd multiline"><code id="cmd-brew">brew tap rescenedev/anf
+      <p class="sub centered">Download the .dmg and drag it to Applications. macOS Apple Silicon recommended.</p>
+      <div class="dl-row">
+        <a class="dl-btn" href="https://github.com/rescenedev/anf/releases/latest/download/anf.dmg">
+          <span class="dl-ic">⤓</span>
+          <span class="dl-txt"><b>Download anf.dmg</b><small>macOS 14+ · Apple Silicon</small></span>
+        </a>
+        <a class="dl-alt" href="https://github.com/rescenedev/anf/releases/latest">All releases ↗</a>
+      </div>
+      <p class="note centered" style="margin-top:14px">Then <strong>drag anf.app into your Applications folder</strong>.</p>
+
+      <details class="install-more">
+        <summary>Or install with Homebrew (auto-updates)</summary>
+        <div class="install-box">
+          <div class="cmd multiline"><code id="cmd-brew">brew tap rescenedev/anf
 brew trust rescenedev/anf
 brew install --cask anf</code><button class="copy-btn" type="button" data-target="cmd-brew" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
-        <p class="note">Update with <code>brew upgrade --cask anf</code>. This is a self-signed build, so if Gatekeeper blocks the first launch,
-          <strong>right-click anf.app → Open</strong>, or strip the quarantine flag:</p>
-        <div class="cmd"><code>xattr -dr com.apple.quarantine /Applications/anf.app</code><button class="copy-btn" type="button" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
-        <p class="note">Optional — install <code>fd</code> and <code>ripgrep</code> for faster name/content search (falls back to Spotlight without them):</p>
-        <div class="cmd"><code>brew install fd ripgrep</code><button class="copy-btn" type="button" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
-        <p class="note">Optional — full rich HWP/HWPX previews (alhangeul). anf extracts the body text on its own even without it:</p>
-        <div class="cmd"><code>brew install --cask postmelee/tap/alhangeul</code><button class="copy-btn" type="button" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
-      </div>
+          <p class="note">Update with <code>brew upgrade --cask anf</code>.</p>
+          <p class="note">Optional — install <code>fd</code> and <code>ripgrep</code> for faster name/content search (falls back to Spotlight without them):</p>
+          <div class="cmd"><code>brew install fd ripgrep</code><button class="copy-btn" type="button" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+          <p class="note">Optional — full rich HWP/HWPX previews (alhangeul). anf extracts the body text on its own even without it:</p>
+          <div class="cmd"><code>brew install --cask postmelee/tap/alhangeul</code><button class="copy-btn" type="button" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+        </div>
+      </details>
     </div>
   </section>
 

@@ -438,6 +438,38 @@ kbd {
 .vault-band .ticks { margin-top: 30px; }
 @media (max-width: 880px) { .vault-grid { grid-template-columns: 1fr; } }
 
+/* ---- Download (.dmg) install ---- */
+.dl-row {
+  display: flex; align-items: center; justify-content: center; gap: 18px;
+  flex-wrap: wrap; margin-top: 44px;
+}
+.dl-btn {
+  display: inline-flex; align-items: center; gap: 14px;
+  padding: 16px 28px; border-radius: 16px; color: #fff;
+  background: linear-gradient(90deg, #2997ff, #7c5cff 60%, #ff5ea8);
+  box-shadow: 0 10px 30px rgba(124,92,255,.32); transition: filter .15s, transform .12s;
+}
+.dl-btn:hover { filter: brightness(1.07); transform: translateY(-1px); }
+.dl-ic { font-size: 26px; line-height: 1; }
+.dl-txt { display: flex; flex-direction: column; line-height: 1.25; text-align: left; }
+.dl-txt b { font-size: 17px; font-weight: 700; }
+.dl-txt small { font-size: 12px; opacity: .8; }
+.dl-alt { color: var(--txt-dim); font-size: 14px; font-weight: 600; }
+.dl-alt:hover { color: var(--txt); }
+.install-more {
+  max-width: 660px; margin: 28px auto 0; border: 1px solid var(--line);
+  border-radius: var(--radius); background: var(--tile); overflow: hidden;
+}
+.install-more > summary {
+  cursor: pointer; padding: 16px 22px; font-size: 14.5px; font-weight: 600;
+  color: var(--txt-dim); list-style: none;
+}
+.install-more > summary::-webkit-details-marker { display: none; }
+.install-more > summary::before { content: "▸ "; color: var(--txt-faint); }
+.install-more[open] > summary::before { content: "▾ "; }
+.install-more > summary:hover { color: var(--txt); }
+.install-more .install-box { margin: 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+
 /* Hero install CTA */
 .hero-cta {
   display: flex; align-items: center; gap: 14px; justify-content: center;
