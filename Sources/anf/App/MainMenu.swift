@@ -11,9 +11,20 @@ final class ViewMenuController: NSObject, NSMenuItemValidation {
         workspace?.save()
     }
 
+    @objc func showWelcome(_ sender: Any?) {
+        workspace?.showWelcome = true
+    }
+
+    @objc func restoreLastSplit(_ sender: Any?) {
+        workspace?.restoreLastSplit()
+    }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(toggleStatusBar(_:)) {
             item.state = (workspace?.pathBarVisible ?? false) ? .on : .off
+        }
+        if item.action == #selector(restoreLastSplit(_:)) {
+            return workspace?.hasLastSplitBackup == true
         }
         return workspace != nil
     }
@@ -63,6 +74,15 @@ enum MainMenu {
                                          action: #selector(ViewMenuController.toggleStatusBar(_:)),
                                          keyEquivalent: "/")
         statusBar.target = ViewMenuController.shared
+        viewMenu.addItem(.separator())
+        let restoreSplit = viewMenu.addItem(withTitle: L("Restore Last Split Layout", "마지막 분할 배치 복원"),
+                                            action: #selector(ViewMenuController.restoreLastSplit(_:)),
+                                            keyEquivalent: "")
+        restoreSplit.target = ViewMenuController.shared
+        let welcome = viewMenu.addItem(withTitle: L("Shortcuts at a Glance", "단축키 한눈에 보기"),
+                                       action: #selector(ViewMenuController.showWelcome(_:)),
+                                       keyEquivalent: "")
+        welcome.target = ViewMenuController.shared
 
         // Window menu
         let windowItem = NSMenuItem()

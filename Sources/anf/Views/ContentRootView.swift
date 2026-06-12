@@ -34,6 +34,7 @@ struct ContentRootView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: workspace.inspectorVisible)
         .overlay(alignment: .bottom) { TransferHUD() }
+        .overlay { WelcomeOverlay(workspace: workspace) }
         .overlay(alignment: .top) { UpdateBanner() }
         .task { UpdateChecker.shared.checkIfDue() }
     }

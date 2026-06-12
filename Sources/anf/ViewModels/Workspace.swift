@@ -144,6 +144,8 @@ final class WorkspaceModel {
     var paletteVisible = false {
         didSet { InputGate.modalActive = paletteVisible }
     }
+    /// First-launch shortcut cheat sheet (reopenable from the View menu).
+    var showWelcome = !UserDefaults.standard.bool(forKey: "anf.welcomed.v1")
     let favorites = FavoritesStore()
     let customSSH = CustomSSHStore()
     let savedViews = SavedViewsStore()
@@ -475,6 +477,18 @@ final class WorkspaceModel {
         applySnapshot(view.snapshot)
     }
 
+    /// One-deep backup of the last multi-pane arrangement, captured whenever a
+    /// layout change collapses panes. Restored via 보기 → 마지막 분할 배치 복원.
+    @ObservationIgnored private var lastSplitBackup: ViewSnapshot?
+
+    func restoreLastSplit() {
+        guard let snap = lastSplitBackup else { NSSound.beep(); return }
+        activeViewID = nil
+        applySnapshot(snap)
+    }
+
+    var hasLastSplitBackup: Bool { lastSplitBackup != nil }
+
     // MARK: - Pinned-folder split memory
 
     /// The pinned folder the window is currently "in" (set by openPinned). While
@@ -554,6 +568,11 @@ final class WorkspaceModel {
         activeViewID = nil
         let oldCount = layout.count
         let here = active.currentURL
+        // Shrinking discards a hand-built arrangement — keep one automatic
+        // backup so an accidental ⌘1 isn't destructive (보기 → 복원).
+        if l.count < oldCount, oldCount > 1 {
+            lastSplitBackup = captureSnapshot()
+        }
         layout = l
         // Splitting starts every newly revealed pane at the folder being split
         // (not whatever stale tabs it held), so 1→4 shows four copies of the
