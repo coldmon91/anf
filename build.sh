@@ -21,6 +21,15 @@ cp "$BIN" "$BIN_DIR/anf"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 [ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns "$RES_DIR/AppIcon.icns"
 
+# The SwiftPM resource bundle (xterm terminal page, l10n tables) MUST ship inside
+# the app: without it 1.0.0 crashed on every non-dev machine the moment the
+# terminal opened (or at launch on non-ko/en locales).
+cp -R "$(swift build -c "$CONFIG" --show-bin-path)/anf_anf.bundle" "$RES_DIR/"
+[ -f "$RES_DIR/anf_anf.bundle/xterm/terminal.html" ] || {
+    echo "✗ resource bundle missing from $APP (xterm/terminal.html not found)" >&2
+    exit 1
+}
+
 # Sign with the stable self-signed identity if present (keeps TCC file-access
 # permissions across rebuilds); fall back to ad-hoc otherwise.
 # Set up once with: ./tools/setup-signing.sh

@@ -19,8 +19,8 @@ enum L10n {
         for lang in Locale.preferredLanguages {
             let code = String(lang.prefix(2))
             if code == "en" || code == "ko" { return nil }   // in-code languages
-            if let url = Bundle.module.url(forResource: code, withExtension: "strings",
-                                           subdirectory: "l10n"),
+            if let url = anfResourceBundle?.url(forResource: code, withExtension: "strings",
+                                                subdirectory: "l10n"),
                let dict = NSDictionary(contentsOf: url) as? [String: String] {
                 return dict
             }

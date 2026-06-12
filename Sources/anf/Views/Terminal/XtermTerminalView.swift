@@ -80,8 +80,8 @@ final class XtermTerminalView: NSView {
     // MARK: - Internals
 
     private func loadPage() {
-        guard let url = Bundle.module.url(forResource: "terminal", withExtension: "html",
-                                          subdirectory: "xterm") else {
+        guard let url = anfResourceBundle?.url(forResource: "terminal", withExtension: "html",
+                                               subdirectory: "xterm") else {
             // Fallback: load from build directory
             let fallback = URL(fileURLWithPath: #file)
                 .deletingLastPathComponent().deletingLastPathComponent()
@@ -95,6 +95,9 @@ final class XtermTerminalView: NSView {
 
     fileprivate func pageReady() {
         ready = true
+        // The terminal smoke test (ANF_TERMINAL_SMOKE=1) listens for this to
+        // prove xterm resources load from the SHIPPED bundle, not the dev tree.
+        NotificationCenter.default.post(name: .init("anf.terminal.pageReady"), object: nil)
         if let size = pendingFontSize { setFontSize(size); pendingFontSize = nil }
         // Give WKWebView first-responder status so keyboard and scroll events arrive.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
