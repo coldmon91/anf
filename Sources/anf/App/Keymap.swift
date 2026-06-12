@@ -78,10 +78,15 @@ final class Keymap {
         ) { _ in MainActor.assumeIsolated { Keymap.shared.reloadIfChanged() } }
     }
 
-    /// The action bound to this exact (modifiers, key token), if any.
+    /// Only these modifiers participate in matching. Arrow and function keys
+    /// also set .numericPad/.function on the event (and Caps Lock adds
+    /// .capsLock) — exact-mask comparison broke ⌘↓/⌘↑ and F5/F6 in 1.1.0.
+    nonisolated static let relevantFlags: NSEvent.ModifierFlags =
+        [.command, .shift, .option, .control]
+
+    /// The action bound to this (modifiers, key token), if any.
     func action(flags: NSEvent.ModifierFlags, key: String) -> KeyAction? {
-        bindings[Chord(flags: flags.intersection(.deviceIndependentFlagsMask).rawValue,
-                       key: key)]
+        bindings[Chord(flags: flags.intersection(Self.relevantFlags).rawValue, key: key)]
     }
 
     // MARK: - Loading
@@ -150,7 +155,7 @@ final class Keymap {
             }
         }
         guard let key else { return nil }
-        return Chord(flags: flags.intersection(.deviceIndependentFlagsMask).rawValue, key: key)
+        return Chord(flags: flags.intersection(relevantFlags).rawValue, key: key)
     }
 
     /// Tokens we can actually match against an NSEvent.

@@ -74,6 +74,28 @@ func runKeymapTests() {
         T.equal(junk[chord("cmd+t")!], .newTab, "junk entries ignored, defaults intact")
     }
 
+    T.group("hidden event flags don't break matching (1.1.0 regression)") {
+        // Arrow keys carry .numericPad|.function on the real NSEvent; F-keys
+        // carry .function; Caps Lock adds .capsLock. v1.1.0 compared the full
+        // mask, which killed ⌘↑/⌘↓/⌘←/⌘→ and F5/F6 — folder navigation died.
+        let map = Keymap.effectiveBindings(fileAt: dir.appendingPathComponent("none.json"))
+        func match(_ flags: NSEvent.ModifierFlags, _ key: String) -> KeyAction? {
+            map[Keymap.Chord(flags: flags.intersection(Keymap.relevantFlags).rawValue, key: key)]
+        }
+        T.equal(match([.command, .numericPad, .function], "down"), .openSelected,
+                "⌘↓ with the arrow-key extra flags → openSelected")
+        T.equal(match([.command, .numericPad, .function], "up"), .goUp,
+                "⌘↑ → goUp")
+        T.equal(match([.command, .numericPad, .function], "left"), .goBack,
+                "⌘← → goBack")
+        T.equal(match([.function], "f5"), .transferCopy,
+                "F5 with .function → transferCopy")
+        T.equal(match([.command, .capsLock], "t"), .newTab,
+                "Caps Lock doesn't break ⌘T")
+        T.expect(Keymap.relevantFlags == [.command, .shift, .option, .control],
+                 "matching considers exactly cmd/shift/opt/ctrl")
+    }
+
     T.group("event token normalization") {
         T.equal(Keymap.token(keyCode: 40, fallback: "ㅏ"), "k", "Korean IME: physical K wins")
         T.equal(Keymap.token(keyCode: 49, fallback: " "), "space", "space by keyCode")
