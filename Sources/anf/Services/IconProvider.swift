@@ -10,7 +10,10 @@ final class IconProvider {
     private let cache = NSCache<NSString, NSImage>()
     private let workspace = NSWorkspace.shared
 
-    private init() { cache.countLimit = 2048 }
+    private init() {
+        cache.countLimit = 2_048
+        cache.totalCostLimit = 16 * 1024 * 1024   // icons are shared per-type; 16 MB is plenty
+    }
 
     func icon(for item: FileItem) -> NSImage {
         let key: NSString
@@ -37,7 +40,7 @@ final class IconProvider {
             image = workspace.icon(for: .data)
         }
         image.size = NSSize(width: 128, height: 128)
-        cache.setObject(image, forKey: key)
+        cache.setObject(image, forKey: key, cost: 128 * 128 * 4 * 4)
         return image
     }
 }

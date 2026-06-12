@@ -342,7 +342,10 @@ final class WorkspaceModel {
             splitRatioH: splitRatioH,
             splitRatioV: splitRatioV,
             terminalFontSize: terminalFontSize,
-            panes: panes.map { pane in
+            // Only visible panes persist: setLayout resets newly revealed panes
+            // to the current folder anyway, so saving hidden panes' tabs only
+            // resurrects dead listings (a hidden 26k tab cost ~15MB at launch).
+            panes: panes.prefix(layout.count).map { pane in
                 PaneState(
                     tabs: pane.tabs.map { TabState(path: $0.currentURL.path, viewMode: $0.viewMode.rawValue) },
                     activeIndex: pane.activeIndex
@@ -383,7 +386,7 @@ final class WorkspaceModel {
             terminalFontSize = min(max(CGFloat(fs), 8), 24)
         }
 
-        for (i, paneState) in state.panes.enumerated() where i < panes.count {
+        for (i, paneState) in state.panes.enumerated() where i < layout.count && i < panes.count {
             let validTabs = paneState.tabs.filter {
                 var isDir: ObjCBool = false
                 return fm.fileExists(atPath: $0.path, isDirectory: &isDir) && isDir.boolValue

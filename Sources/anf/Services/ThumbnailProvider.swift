@@ -10,7 +10,16 @@ final class ThumbnailProvider {
     private let cache = NSCache<NSString, NSImage>()
     private let generator = QLThumbnailGenerator.shared
 
-    private init() { cache.countLimit = 1024 }
+    private init() {
+        // Count alone is not a memory bound — 1,024 retina thumbnails at 168pt
+        // can exceed 400MB. Cost-account by bitmap bytes and cap the total.
+        cache.countLimit = 1_024
+        cache.totalCostLimit = 64 * 1024 * 1024   // 64 MB of pixels
+    }
+
+    private static func cost(of image: NSImage) -> Int {
+        Int(image.size.width * image.size.height) * 4 * 4   // RGBA × ~2x scale²
+    }
 
     private func key(_ url: URL, _ side: CGFloat) -> NSString {
         "\(url.path)@\(Int(side))" as NSString
@@ -39,7 +48,7 @@ final class ThumbnailProvider {
                 cont.resume(returning: rep?.nsImage)
             }
         }
-        if let image { cache.setObject(image, forKey: k) }
+        if let image { cache.setObject(image, forKey: k, cost: Self.cost(of: image)) }
         return image
     }
 }

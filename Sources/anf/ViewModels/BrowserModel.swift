@@ -43,8 +43,15 @@ final class BrowserModel: Identifiable {
     }
     var sort = SortOrder() { didSet { recomputeItems() } }
     var showHidden = false { didSet { reload() } }
-    var iconSize: Double = 84
-    var textScale: Double = 1.0
+    /// Icon and text sizes are app-wide preferences: every tab — including ones
+    /// created later by splits, Workspace restores or relaunch — starts at the
+    /// size the user last chose (⌘±) instead of snapping back to the default.
+    var iconSize: Double = UserDefaults.standard.object(forKey: "anf.iconSize") as? Double ?? 84 {
+        didSet { UserDefaults.standard.set(iconSize, forKey: "anf.iconSize") }
+    }
+    var textScale: Double = UserDefaults.standard.object(forKey: "anf.textScale") as? Double ?? 1.0 {
+        didSet { UserDefaults.standard.set(textScale, forKey: "anf.textScale") }
+    }
     var filterText = "" { didSet { if filterText != oldValue { recomputeItems() } } }
     var inspectorVisible = false
     var sidebarVisible = true

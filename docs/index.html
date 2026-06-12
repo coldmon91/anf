@@ -148,6 +148,8 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
         <tr><td>PDF 32개 본문 검색 스윕</td><td class="num">410 ms → 4 ms</td><td>첫 검색만 추출, 이후 키 입력은 캐시 매칭</td></tr>
         <tr><td>55,860개 항목(622MB) 폴더 복사</td><td class="num">6.8 초</td><td>병렬 APFS 클론 — cp -Rc(8.4s)보다 빠름, 전 과정 백그라운드 + 진행률 + 즉시 취소</td></tr>
         <tr><td>디렉토리 150,696개 소크</td><td class="num">실패 0</td><td>실제 홈 트리 전체를 읽기+정렬 경로로 순회, kr 외 전부 &lt;55ms</td></tr>
+        <tr><td>앱 크기</td><td class="num">3.4 MB</td><td>네이티브 단일 바이너리 — Electron 파일 매니저의 1/50 수준</td></tr>
+        <tr><td>메모리</td><td class="num">~110 MB</td><td>26,549개 폴더 세션 포함, 라이브 힙 ~30 MB — 썸네일·목록 캐시 모두 바이트 상한</td></tr>
         <tr><td>유휴 CPU</td><td class="num">~0 %</td><td>인덱스는 필요할 때만 갱신</td></tr>
       </tbody>
     </table></div>

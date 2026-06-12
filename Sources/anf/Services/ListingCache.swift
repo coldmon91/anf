@@ -16,8 +16,8 @@ final class ListingCache {
     private var map: [String: Entry] = [:]
     private var lru: [String] = []   // most recently used last
     /// Bounded by total cached items, not folder count — one 26k folder costs
-    /// what many small ones do.
-    private let itemBudget = 120_000
+    /// what many small ones do. 60k items ≈ ~18 MB worst case.
+    private let itemBudget = 60_000
 
     private func key(_ url: URL, hidden: Bool, sort: SortOrder) -> String {
         "\(url.path)|\(hidden)|\(sort.key.rawValue)|\(sort.ascending)"

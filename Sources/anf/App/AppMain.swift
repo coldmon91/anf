@@ -188,6 +188,14 @@ public func anfMain() {
     // default delay (~1.5s) makes them feel absent, so shorten it app-wide.
     UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 500])
     HangWatchdog.startIfRequested()
+    // Return allocator slack to the OS periodically: after a burst (26k listing,
+    // bulk copy) malloc keeps freed pages dirty, which reads as a bloated
+    // footprint in Activity Monitor even though the live heap is ~30MB.
+    let memoryTrim = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+    memoryTrim.schedule(deadline: .now() + 30, repeating: 30)
+    memoryTrim.setEventHandler { malloc_zone_pressure_relief(nil, 0) }
+    memoryTrim.activate()
+    objc_setAssociatedObject(NSApplication.shared, "anf.memtrim", memoryTrim, .OBJC_ASSOCIATION_RETAIN)
     let app = NSApplication.shared
     let controller = AppController()
     app.delegate = controller
