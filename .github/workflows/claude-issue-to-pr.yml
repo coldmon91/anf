@@ -1,6 +1,9 @@
 name: Claude Issue → PR
 
-# 이슈에 'claude' 레이블을 달면 Claude가 이슈를 읽고 구현 → PR을 엽니다.
+# 이슈에 'claude' 레이블을 달면 Claude가 macOS 러너에서 이슈를 분석하고,
+# 회귀 테스트와 함께 수정을 구현해 테스트 통과까지 확인한 뒤 PR을 엽니다.
+# (외부 이슈가 자동으로 토큰을 태우지 않도록 레이블이 게이트 역할을 합니다 —
+# 텔레그램 알림으로 이슈를 본 뒤 레이블 한 번 붙이는 것이 트리거입니다.)
 on:
   issues:
     types: [labeled]
@@ -8,7 +11,9 @@ on:
 jobs:
   issue-to-pr:
     if: github.event.label.name == 'claude'
-    runs-on: ubuntu-latest
+    # Swift/AppKit을 실제로 빌드·테스트해야 하므로 macOS 러너가 필수다 —
+    # ubuntu에서는 swift build조차 불가능해 PR이 만들어질 수 없었다.
+    runs-on: macos-26
     permissions:
       contents: write
       pull-requests: write
@@ -29,14 +34,24 @@ jobs:
             actions: read
           prompt: |
             GitHub 이슈 #${{ github.event.issue.number }} 를 해결하세요.
-
             제목: ${{ github.event.issue.title }}
 
-            절차:
-            1. 이슈 본문의 요구사항을 정확히 이해합니다.
-            2. 새 브랜치를 만들고 변경을 구현합니다.
-            3. `./build.sh` 로 빌드가 통과하는지 확인합니다.
-            4. 커밋 후, 이 이슈(#${{ github.event.issue.number }})를 닫는 Pull Request를 엽니다.
-               PR 본문에 변경 요약과 테스트 방법을 적습니다.
+            이 저장소의 규칙 (CLAUDE.md · TESTING.md · METHODOLOGY.md 참고):
+            - 모든 버그 수정에는 그 시나리오를 재현하는 회귀 테스트를 함께
+              추가합니다. Tests/anfTests/ 의 자체 하니스(T.group/T.expect/T.equal)를
+              쓰고, Tests/anfTests/main.swift 에 등록합니다.
+            - UI 문자열은 L("English", "한국어") 페어. 추가/변경했다면
+              python3 tools/gen-l10n.py 로 템플릿을 재생성해 함께 커밋합니다.
 
-            요구사항이 모호하면 추측하지 말고, 코드를 바꾸는 대신 이슈에 코멘트로 질문만 남기세요.
+            절차:
+            1. 이슈 본문의 요구사항·재현 시나리오를 정확히 이해합니다.
+            2. 새 브랜치에서 최소 변경으로 구현합니다. main 직접 푸시 금지.
+            3. 회귀 테스트를 추가하고 `swift run anfTests` 전체 통과(exit 0)를
+               확인합니다.
+            4. `python3 tools/gen-l10n.py --check` 통과도 확인합니다.
+            5. 이 이슈를 닫는("Fixes #${{ github.event.issue.number }}") PR을
+               엽니다. PR 본문: 원인 분석 · 변경 요약 · 테스트 방법.
+
+            요구사항이 모호하거나 제품 결정이 필요한 경우(동작을 어느 쪽으로
+            바꿀지 등)에는 추측하지 말고, 코드를 바꾸는 대신 이슈에 코멘트로
+            선택지를 제시하세요.
