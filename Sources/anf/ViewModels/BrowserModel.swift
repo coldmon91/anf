@@ -477,7 +477,10 @@ final class BrowserModel: Identifiable {
             if ok { self?.reload() }
             else { FileOperations.presentFailures(
                 L("Couldn’t create Vault", "Vault를 만들지 못했습니다"),
-                [L("git is required and must be available.", "git이 필요합니다.")]) }
+                // Not a nag — most Macs already have git. A one-line way out for
+                // the rare machine (often a non-developer's) that doesn't.
+                [L("Vault needs the system git. Install it by running this in Terminal: xcode-select --install",
+                   "Vault에는 시스템 git이 필요합니다. 터미널에서 다음을 실행하면 설치됩니다: xcode-select --install")]) }
         }
     }
 

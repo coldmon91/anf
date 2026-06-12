@@ -79,7 +79,7 @@
 "SFTP Mount" = "SFTP 마운트";
 "Snapshot" = "스냅샷";
 "Couldn’t create Vault" = "Vault를 만들지 못했습니다";
-"git is required and must be available." = "git이 필요합니다.";
+"Vault needs the system git. Install it by running this in Terminal: xcode-select --install" = "Vault에는 시스템 git이 필요합니다. 터미널에서 다음을 실행하면 설치됩니다: xcode-select --install";
 "Turn off Vault for this folder?" = "이 폴더의 Vault를 끌까요?";
 "Your files stay. The version history and protection are removed." = "파일은 그대로 유지됩니다. 버전 히스토리와 보호만 제거됩니다.";
 "Turn Off" = "끄기";
