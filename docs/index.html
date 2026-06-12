@@ -20,7 +20,7 @@
 <meta name="theme-color" content="#060607">
 <link rel="alternate" hreflang="ko" href="https://rescenedev.github.io/anf/">
 <link rel="alternate" hreflang="en" href="https://rescenedev.github.io/anf/en/">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 
@@ -91,11 +91,6 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
       <p class="sub centered">파일을 다루는 데 필요한 것들을 자연스럽게 모았습니다.</p>
       <div class="grid">
         <div class="tile">
-          <div class="ic">🔒</div>
-          <h3>Vault — 시간을 되돌리는 금고</h3>
-          <p>폴더를 Vault로 보호하면, 파일을 지우고 <strong>휴지통까지 비워도</strong> 타임라인에서 되살립니다. 5분마다 백그라운드 자동 스냅샷 — Git이 도는 줄도 모르게. 클라우드 없이 로컬에만.</p>
-        </div>
-        <div class="tile">
           <div class="ic">▦</div>
           <h3>유연한 분할 뷰</h3>
           <p>단일 · 2분할 좌우 · 상하 2행 · 4분할. 분할선을 드래그해 크기를 조절하고, 창 위치·레이아웃·보기 형태는 따로 저장할 것 없이 그대로 기억됩니다.</p>
@@ -152,35 +147,6 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
         </div>
       </div>
     </div>
-  </section>
-
-  <!-- Vault (flagship) -->
-  <section id="vault" class="showcase vault-band">
-    <div class="vault-badge">새로워진 1.0</div>
-    <h2 class="centered">지운 파일도 되돌아옵니다.</h2>
-    <p class="sub centered">폴더를 <b>Vault</b>로 보호하세요. 실수로 지우고 휴지통까지 비워도, 시간을 거슬러 그대로 복구합니다.</p>
-    <div class="vault-grid">
-      <div class="vault-step">
-        <div class="vault-num">1</div>
-        <h3>우클릭 한 번으로 보호</h3>
-        <p>폴더를 Vault로 지정하면 끝. 이후 5분마다 백그라운드에서 조용히 스냅샷을 찍습니다. 유휴 CPU ~0%, Git이 도는 줄도 모릅니다.</p>
-      </div>
-      <div class="vault-step">
-        <div class="vault-num">2</div>
-        <h3>휴지통을 비워도 안전</h3>
-        <p>macOS 휴지통을 비워도, 외부에서 강제 삭제해도 데이터는 Vault 안에 격리되어 살아남습니다. 클라우드 의존성 0 — 전부 내 Mac에만.</p>
-      </div>
-      <div class="vault-step">
-        <div class="vault-num">3</div>
-        <h3>타임라인에서 원클릭 복구</h3>
-        <p>"Vault 타임라인"을 열어 원하는 시점을 고르고, 사라진 파일을 클릭 한 번으로 되살립니다. 버전별로 어떤 시점이든.</p>
-      </div>
-    </div>
-    <ul class="ticks centered-list">
-      <li>로컬 git 엔진 기반 — 새 의존성 0, 앱 번들 그대로 3.4MB</li>
-      <li>개발 프로젝트(이미 .git 있는 폴더)는 <code>.anf_vault</code>로 격리해 기존 저장소를 절대 건드리지 않음</li>
-      <li>50MB 이상 대용량 바이너리는 자동 우회 격리로 저장소 비대화 차단</li>
-    </ul>
   </section>
 
   <!-- Why fast -->
@@ -398,6 +364,35 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
       </div>
       <p class="note centered">방법론 전체는 <a href="https://github.com/rescenedev/anf/blob/main/METHODOLOGY.md" target="_blank" rel="noopener">METHODOLOGY.md</a>, 테스트 시나리오는 <a href="https://github.com/rescenedev/anf/blob/main/TESTING.md" target="_blank" rel="noopener">TESTING.md</a>에 공개되어 있습니다.</p>
     </div>
+  </section>
+
+  <!-- Vault (flagship) -->
+  <section id="vault" class="showcase vault-band">
+    <div class="vault-badge">one more thing</div>
+    <h2 class="centered">지운 파일도 되돌아옵니다.</h2>
+    <p class="sub centered">폴더를 <b>Vault</b>로 보호하세요. 실수로 지우고 휴지통까지 비워도, 시간을 거슬러 그대로 복구합니다.</p>
+    <div class="vault-grid">
+      <div class="vault-step">
+        <div class="vault-num">1</div>
+        <h3>우클릭 한 번으로 보호</h3>
+        <p>폴더를 Vault로 지정하면 끝. 이후 5분마다 백그라운드에서 조용히 스냅샷을 찍습니다. 유휴 CPU ~0%, Git이 도는 줄도 모릅니다.</p>
+      </div>
+      <div class="vault-step">
+        <div class="vault-num">2</div>
+        <h3>휴지통을 비워도 안전</h3>
+        <p>macOS 휴지통을 비워도, 외부에서 강제 삭제해도 데이터는 Vault 안에 격리되어 살아남습니다. 클라우드 의존성 0 — 전부 내 Mac에만.</p>
+      </div>
+      <div class="vault-step">
+        <div class="vault-num">3</div>
+        <h3>타임라인에서 원클릭 복구</h3>
+        <p>"Vault 타임라인"을 열어 원하는 시점을 고르고, 사라진 파일을 클릭 한 번으로 되살립니다. 버전별로 어떤 시점이든.</p>
+      </div>
+    </div>
+    <ul class="ticks centered-list">
+      <li>로컬 git 엔진 기반 — 새 의존성 0, 앱 번들 그대로 3.4MB</li>
+      <li>개발 프로젝트(이미 .git 있는 폴더)는 <code>.anf_vault</code>로 격리해 기존 저장소를 절대 건드리지 않음</li>
+      <li>50MB 이상 대용량 바이너리는 자동 우회 격리로 저장소 비대화 차단</li>
+    </ul>
   </section>
 
   <!-- Privacy -->

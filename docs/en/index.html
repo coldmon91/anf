@@ -20,7 +20,7 @@
 <meta name="theme-color" content="#060607">
 <link rel="alternate" hreflang="ko" href="https://rescenedev.github.io/anf/">
 <link rel="alternate" hreflang="en" href="https://rescenedev.github.io/anf/en/">
-<link rel="stylesheet" href="../styles.css?v=7">
+<link rel="stylesheet" href="../styles.css?v=8">
 </head>
 <body>
 
@@ -91,11 +91,6 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
       <p class="sub centered">The tools you need for working with files, brought together naturally.</p>
       <div class="grid">
         <div class="tile">
-          <div class="ic">🔒</div>
-          <h3>Vault — a time machine for files</h3>
-          <p>Protect a folder and recover anything from its timeline — even after you deleted it and <strong>emptied the Trash</strong>. Background snapshots every 5 minutes, with Git invisible underneath. Local only, no cloud.</p>
-        </div>
-        <div class="tile">
           <div class="ic">▦</div>
           <h3>Flexible split panes</h3>
           <p>Single · two panes · two rows · four panes. Drag the dividers to resize — window position, layout and view modes are remembered without any setup.</p>
@@ -152,35 +147,6 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
         </div>
       </div>
     </div>
-  </section>
-
-  <!-- Vault (flagship) -->
-  <section id="vault" class="showcase vault-band">
-    <div class="vault-badge">New in 1.0</div>
-    <h2 class="centered">Deleted files come back.</h2>
-    <p class="sub centered">Protect a folder with <b>Vault</b>. Delete something by mistake — empty the Trash, even — and travel back to recover it intact.</p>
-    <div class="vault-grid">
-      <div class="vault-step">
-        <div class="vault-num">1</div>
-        <h3>Protect with one right-click</h3>
-        <p>Mark a folder as a Vault and you're done. It snapshots quietly in the background every 5 minutes — ~0% idle CPU, with Git invisible underneath.</p>
-      </div>
-      <div class="vault-step">
-        <div class="vault-num">2</div>
-        <h3>Safe even after emptying Trash</h3>
-        <p>Empty the macOS Trash, force-delete from outside — the data survives, isolated inside the Vault. Zero cloud dependency; everything stays on your Mac.</p>
-      </div>
-      <div class="vault-step">
-        <div class="vault-num">3</div>
-        <h3>One-click recovery from the timeline</h3>
-        <p>Open the Vault Timeline, pick a point in time, and bring a vanished file back with a single click — any version, any moment.</p>
-      </div>
-    </div>
-    <ul class="ticks centered-list">
-      <li>Built on a local git engine — zero new dependencies, the bundle stays 3.4MB</li>
-      <li>Dev projects (folders that already have a .git) are isolated in <code>.anf_vault</code> so your repo is never touched</li>
-      <li>Binaries over 50MB are side-channelled automatically so the store never bloats</li>
-    </ul>
   </section>
 
   <!-- Why fast -->
@@ -398,6 +364,35 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
       </div>
       <p class="note centered">The full methodology is in <a href="https://github.com/rescenedev/anf/blob/main/METHODOLOGY.md" target="_blank" rel="noopener">METHODOLOGY.md</a>; the test scenarios in <a href="https://github.com/rescenedev/anf/blob/main/TESTING.md" target="_blank" rel="noopener">TESTING.md</a>.</p>
     </div>
+  </section>
+
+  <!-- Vault (flagship) -->
+  <section id="vault" class="showcase vault-band">
+    <div class="vault-badge">one more thing</div>
+    <h2 class="centered">Deleted files come back.</h2>
+    <p class="sub centered">Protect a folder with <b>Vault</b>. Delete something by mistake — empty the Trash, even — and travel back to recover it intact.</p>
+    <div class="vault-grid">
+      <div class="vault-step">
+        <div class="vault-num">1</div>
+        <h3>Protect with one right-click</h3>
+        <p>Mark a folder as a Vault and you're done. It snapshots quietly in the background every 5 minutes — ~0% idle CPU, with Git invisible underneath.</p>
+      </div>
+      <div class="vault-step">
+        <div class="vault-num">2</div>
+        <h3>Safe even after emptying Trash</h3>
+        <p>Empty the macOS Trash, force-delete from outside — the data survives, isolated inside the Vault. Zero cloud dependency; everything stays on your Mac.</p>
+      </div>
+      <div class="vault-step">
+        <div class="vault-num">3</div>
+        <h3>One-click recovery from the timeline</h3>
+        <p>Open the Vault Timeline, pick a point in time, and bring a vanished file back with a single click — any version, any moment.</p>
+      </div>
+    </div>
+    <ul class="ticks centered-list">
+      <li>Built on a local git engine — zero new dependencies, the bundle stays 3.4MB</li>
+      <li>Dev projects (folders that already have a .git) are isolated in <code>.anf_vault</code> so your repo is never touched</li>
+      <li>Binaries over 50MB are side-channelled automatically so the store never bloats</li>
+    </ul>
   </section>
 
   <!-- Privacy -->
