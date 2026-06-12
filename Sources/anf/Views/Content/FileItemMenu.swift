@@ -60,7 +60,7 @@ enum FileItemMenu {
         }
         add(L("Duplicate", "복제")) { model.duplicateSelection() }
         menu.addItem(.separator())
-        if item.ext == "zip" && model.selection.count <= 1 {
+        if item.isArchive && model.selection.count <= 1 {
             add(L("Extract", "압축 풀기")) { ArchiveService.extract(item) { model.reload() } }
         } else {
             add(model.selection.count > 1

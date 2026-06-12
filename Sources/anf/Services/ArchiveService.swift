@@ -35,14 +35,66 @@ enum ArchiveService {
         }
     }
 
-    /// Extract a .zip into a uniquely-named folder next to it.
+    /// How a given archive is extracted. `ditto`/`bsdtar` are on every Mac;
+    /// `unar` (The Unarchiver) is optional and covers rar/alz/egg.
+    enum Kind {
+        case zip            // ditto — best Mac metadata preservation
+        case libarchive     // bsdtar (built-in) — 7z, tar.*, cpio, xar, rpm, iso…
+        case needsUnar      // rar / alz / egg / sit — needs `unar`
+    }
+
+    /// Classify an archive by its (possibly compound) extension, or nil if it's
+    /// not an archive anf offers to extract. Pure — safe to call from anywhere.
+    nonisolated static func kind(for url: URL) -> Kind? {
+        let name = url.lastPathComponent.lowercased()
+        // Compound tar variants first.
+        if name.hasSuffix(".tar.gz") || name.hasSuffix(".tar.bz2")
+            || name.hasSuffix(".tar.xz") || name.hasSuffix(".tar.zst")
+            || name.hasSuffix(".tgz") || name.hasSuffix(".tbz") || name.hasSuffix(".txz") {
+            return .libarchive
+        }
+        switch (name as NSString).pathExtension {
+        case "zip": return .zip
+        case "7z", "tar", "gz", "bz2", "xz", "zst", "cpio", "xar", "rpm",
+             "iso", "jar", "war", "cbz": return .libarchive
+        case "rar", "alz", "egg", "sit", "sitx", "lha", "lzh": return .needsUnar
+        default: return nil
+        }
+    }
+
+    /// Extract any supported archive into a uniquely-named folder next to it.
     static func extract(_ item: FileItem, completion: @escaping () -> Void) {
+        guard let kind = kind(for: item.url) else { completion(); return }
         let dir = item.url.deletingLastPathComponent()
-        let base = item.url.deletingPathExtension().lastPathComponent
+        // Strip the full archive suffix for the destination name (foo.tar.gz → foo).
+        var base = item.url.deletingPathExtension().lastPathComponent
+        if base.lowercased().hasSuffix(".tar") { base = (base as NSString).deletingPathExtension }
         let dest = FileOperations.uniqueURL(for: base, in: dir)
+
+        // unar needs to be present; guide the user if it isn't.
+        if kind == .needsUnar, ExternalTools.path("unar") == nil {
+            FileOperations.presentFailures(
+                L("This format needs ‘unar’", "이 형식은 ‘unar’가 필요합니다"),
+                [L("Install it once with: brew install unar", "한 번만 설치하세요: brew install unar")])
+            completion(); return
+        }
+
         Task {
+            let srcPath = item.url.path, destPath = dest.path
+            let unar = ExternalTools.path("unar")
             let error = await Task.detached(priority: .userInitiated) { () -> String? in
-                run("/usr/bin/ditto", ["-x", "-k", item.url.path, dest.path])
+                switch kind {
+                case .zip:
+                    return run("/usr/bin/ditto", ["-x", "-k", srcPath, destPath])
+                case .libarchive:
+                    // bsdtar needs the destination to exist; it writes contents into it.
+                    try? FileManager.default.createDirectory(atPath: destPath,
+                                                             withIntermediateDirectories: true)
+                    return run("/usr/bin/bsdtar", ["-x", "-f", srcPath, "-C", destPath])
+                case .needsUnar:
+                    return run(unar!, ["-quiet", "-output-directory", destPath,
+                                       "-force-overwrite", srcPath])
+                }
             }.value
             if let error {
                 FileOperations.presentFailures(L("Couldn’t extract", "압축을 풀지 못했습니다"), [error])

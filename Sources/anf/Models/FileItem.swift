@@ -33,6 +33,10 @@ struct FileItem: Identifiable, Hashable, Sendable {
     /// text (hwpx/docx/pptx/xlsx) — no QuickLook generator needed.
     var isExtractableDocument: Bool { ["hwpx", "docx", "pptx", "xlsx"].contains(ext) }
 
+    /// True for any archive anf can offer to extract. Compound extensions
+    /// (tar.gz / tar.bz2 / tar.xz / tgz) are matched on the full suffix.
+    var isArchive: Bool { ArchiveService.kind(for: url) != nil }
+
     /// Scripts/source/plain text — previewed with our own readable text view
     /// (Quick Look renders these tiny). Rich text formats stay on Quick Look.
     var isPlainTextLike: Bool {
