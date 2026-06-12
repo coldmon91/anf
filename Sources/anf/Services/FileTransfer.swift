@@ -9,6 +9,15 @@ enum ConflictPolicy {
     case skip
 }
 
+/// Cross-thread cancellation checked between items WITHOUT a MainActor hop —
+/// awaiting the main actor once per item costs seconds across 26k items.
+final class CancelFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    func set() { lock.lock(); value = true; lock.unlock() }
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
+}
+
 /// All copy/move traffic goes through here: name-conflict resolution up front,
 /// the work itself off the main thread with byte-progress + cancellation, undo
 /// registration and one error alert at the end. Small jobs never show UI.
@@ -22,11 +31,15 @@ final class FileTransfer {
     private(set) var label = ""
     private(set) var fraction: Double = 0
     private var cancelRequested = false
+    private var cancelFlag: CancelFlag?
+    /// Bumped per job so a stale delayed-HUD task can't resurrect the overlay.
+    private var jobGeneration = 0
+    private var jobDone = true
 
-    /// Jobs smaller than this finish silently (no HUD flash).
-    private let hudThresholdBytes: Int64 = 64 * 1024 * 1024   // 64 MB
-
-    func cancel() { cancelRequested = true }
+    func cancel() {
+        cancelRequested = true
+        cancelFlag?.set()
+    }
 
     /// Copy or move `sources` into `destination`. Asks once about name conflicts,
     /// shows a progress HUD for big jobs, records undo, reports errors, then
@@ -77,62 +90,123 @@ final class FileTransfer {
             FileOperations.moveToTrash(victims)
         }
 
-        // 3) Size each top-level item ONCE (the per-item progress loop reuses the
-        // same numbers — sizing twice doubled the enumeration of big trees).
-        // A same-volume move is metadata-only (instant, no HUD); a cross-volume
-        // move degrades to copy+delete, so it gets sized + a HUD like a copy.
-        let crossVolume = move && Self.volumeID(of: destination) != Self.volumeID(of: plan[0].src)
-        let needsSizing = !move || crossVolume
-        let itemSizes: [Int64] = needsSizing ? plan.map { Self.totalSize(of: [$0.src]) } : []
-        let totalBytes = itemSizes.reduce(0, +)
-        let showHUD = needsSizing && totalBytes > hudThresholdBytes
+        // 3) EVERYTHING heavy runs off the main thread; the HUD is time-based —
+        // it appears only if the job is still running after 400ms, so small
+        // jobs never flash UI. Progress is item-count based: pre-sizing a
+        // 26k-entry tree cost ~1s (and used to beachball right here) for
+        // nothing more than fraction weighting.
+        let verb = move ? L("Moving…", "이동 중…") : L("Copying…", "복사 중…")
 
-        if showHUD {
-            isActive = true
-            fraction = 0
-            cancelRequested = false
-            label = (move ? L("Moving…", "이동 중…") : L("Copying…", "복사 중…")) + L(" (\(plan.count) items)", " (\(plan.count)개 항목)")
+        cancelRequested = false
+        let flag = CancelFlag()
+        cancelFlag = flag
+        jobGeneration &+= 1
+        let gen = jobGeneration
+        jobDone = false
+        fraction = 0
+        label = L("Preparing…", "준비 중…")
+
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard let self, self.jobGeneration == gen, !self.jobDone else { return }
+            self.isActive = true
         }
 
         Task { [weak self] in
             let result = await Task.detached(priority: .userInitiated) {
-                () -> (done: [(from: URL, to: URL)], failures: [String]) in
-                var done: [(URL, URL)] = []
-                var failures: [String] = []
-                var copied: Int64 = 0
-                var lastPushed = ContinuousClock.now
+                () -> (done: [(from: URL, to: URL)], undoCreated: [URL], failures: [String]) in
                 let fm = FileManager.default
-                for (i, pair) in plan.enumerated() {
-                    let (src, dest) = pair
-                    if await self?.cancelRequested == true { break }
-                    do {
-                        if move { try fm.moveItem(at: src, to: dest) }
-                        else { try fm.copyItem(at: src, to: dest) }
-                        done.append((src, dest))
-                    } catch {
-                        failures.append("\(src.lastPathComponent): \(error.localizedDescription)")
-                    }
-                    if showHUD {
-                        copied += itemSizes[i]
-                        // Throttle main-actor hops: thousands of small files would
-                        // otherwise queue thousands of UI updates.
+                var failures: [String] = []
+
+                // A single big folder copies child-by-child: APFS clones per
+                // file either way, but this gives real progress and lets cancel
+                // actually stop mid-tree instead of after the whole folder.
+                var work = plan
+                var expandedRoot: URL?
+                if !move, plan.count == 1,
+                   (try? plan[0].src.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true,
+                   let kids = try? fm.contentsOfDirectory(at: plan[0].src,
+                                                          includingPropertiesForKeys: nil,
+                                                          options: []),
+                   kids.count >= 16,
+                   (try? fm.createDirectory(at: plan[0].dest,
+                                            withIntermediateDirectories: false)) != nil {
+                    expandedRoot = plan[0].dest
+                    work = kids.map { ($0, plan[0].dest.appendingPathComponent($0.lastPathComponent)) }
+                }
+
+                await MainActor.run {
+                    self?.label = verb + L(" (\(work.count) items)", " (\(work.count)개 항목)")
+                }
+
+                var done: [(URL, URL)] = []
+                if move {
+                    // Same-volume moves are metadata renames — serial is instant.
+                    var lastPushed = ContinuousClock.now
+                    for (i, pair) in work.enumerated() {
+                        if flag.isSet { break }
+                        do {
+                            try fm.moveItem(at: pair.src, to: pair.dest)
+                            done.append((pair.src, pair.dest))
+                        } catch {
+                            failures.append("\(pair.src.lastPathComponent): \(error.localizedDescription)")
+                        }
                         let now = ContinuousClock.now
-                        if now - lastPushed > .milliseconds(80) || i == plan.count - 1 {
+                        if now - lastPushed > .milliseconds(80) || i == work.count - 1 {
                             lastPushed = now
-                            let f = totalBytes > 0 ? Double(copied) / Double(totalBytes) : 1
+                            let f = Double(i + 1) / Double(work.count)
                             await MainActor.run { self?.fraction = min(f, 1) }
                         }
                     }
+                } else {
+                    // Copies clone per file on APFS (metadata-bound), so wide
+                    // parallelism pays: 26k-item tree ~14s serial → ~uses every
+                    // core. Shared state behind one lock; UI pushes throttled.
+                    let lock = NSLock()
+                    var completed = 0
+                    var lastPushed = ContinuousClock.now
+                    DispatchQueue.concurrentPerform(iterations: work.count) { i in
+                        if flag.isSet { return }
+                        let (src, dest) = work[i]
+                        var copiedPair: (URL, URL)?
+                        var failure: String?
+                        do {
+                            try FileManager.default.copyItem(at: src, to: dest)
+                            copiedPair = (src, dest)
+                        } catch {
+                            failure = "\(src.lastPathComponent): \(error.localizedDescription)"
+                        }
+                        lock.lock()
+                        if let copiedPair { done.append(copiedPair) }
+                        if let failure { failures.append(failure) }
+                        completed += 1
+                        let n = completed
+                        let now = ContinuousClock.now
+                        let push = now - lastPushed > .milliseconds(80) || n == work.count
+                        if push { lastPushed = now }
+                        lock.unlock()
+                        if push {
+                            let f = Double(n) / Double(work.count)
+                            DispatchQueue.main.async { [weak self] in
+                                guard let self else { return }
+                                MainActor.assumeIsolated { self.fraction = min(f, 1) }
+                            }
+                        }
+                    }
                 }
-                return (done, failures)
+                // Undo for an expanded folder targets the top-level destination,
+                // not 26k children.
+                let undoCreated = expandedRoot.map { [$0] } ?? done.map(\.1)
+                return (done, undoCreated, failures)
             }.value
 
             guard let self else { return }
+            self.jobDone = true
             self.isActive = false
             if !result.done.isEmpty {
                 FileUndo.shared.record(move
                     ? .move(result.done.map { (from: $0.from, to: $0.to) })
-                    : .created(result.done.map(\.to)))
+                    : .created(result.undoCreated))
             }
             if self.cancelRequested {
                 FileOperations.presentFailures(

@@ -48,6 +48,41 @@ func runSoak(root: String) {
     }
 }
 
+/// Large-copy bench through the production FileTransfer path. Run with
+///   ANF_BENCH_COPY=/folder swift run anfTests
+/// Copies the folder into a temp dir (same volume → APFS clones), printing
+/// wall time and verifying the entry count; cleans up afterwards.
+@MainActor
+func runCopyBench(src: String) {
+    let clock = ContinuousClock()
+    let fm = FileManager.default
+    let srcURL = URL(fileURLWithPath: src)
+    let destDir = fm.temporaryDirectory.appendingPathComponent("anf-copybench-\(UUID().uuidString)")
+    try? fm.createDirectory(at: destDir, withIntermediateDirectories: true)
+    defer { try? fm.removeItem(at: destDir) }
+
+    var finished = false
+    let t0 = clock.now
+    FileTransfer.shared.transfer([srcURL], into: destDir, move: false) { finished = true }
+    let deadline = Date().addingTimeInterval(600)
+    while !finished && Date() < deadline {
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    }
+    let d = clock.now - t0
+    let secs = Double(d.components.seconds) + Double(d.components.attoseconds) / 1e18
+
+    func count(_ url: URL) -> Int {
+        var n = 0
+        if let en = fm.enumerator(at: url, includingPropertiesForKeys: nil) {
+            for case _ as URL in en { n += 1 }
+        }
+        return n
+    }
+    let copied = destDir.appendingPathComponent(srcURL.lastPathComponent)
+    print(String(format: "copy bench: %@ → temp in %.1fs (src %d entries, dest %d entries)",
+                 srcURL.lastPathComponent, secs, count(srcURL), count(copied)))
+}
+
 /// PDF body-extraction latency breakdown. Run with
 ///   ANF_BENCH_PDF=/folder/with/pdfs swift run anfTests
 /// Prints per-file size/pages/ms plus the worst case and the wall-clock of the

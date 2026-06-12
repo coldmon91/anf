@@ -16,6 +16,10 @@ if let soakRoot = ProcessInfo.processInfo.environment["ANF_SOAK"] {
     runSoak(root: soakRoot)
     exit(0)
 }
+if let copySrc = ProcessInfo.processInfo.environment["ANF_BENCH_COPY"] {
+    MainActor.assumeIsolated { runCopyBench(src: copySrc) }
+    exit(0)
+}
 
 runFuzzyMatchTests()
 runNormalizedRankTests()
@@ -31,6 +35,7 @@ runGridSelectionTests()
 runTypeaheadTests()
 runListingCacheTests()
 runListDiffTests()
+runTransferTests()
 
 print("")
 if T.failures.isEmpty {
