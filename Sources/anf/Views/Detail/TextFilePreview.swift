@@ -14,13 +14,22 @@ struct TextFilePreview: View {
     var fontSize: CGFloat = 12.5
 
     @State private var text = ""
+    @State private var rich: NSAttributedString?
     @State private var truncated = false
 
     private let byteCap = 512 * 1024
 
     var body: some View {
-        PlainTextScrollView(text: text, fontSize: fontSize)
-            .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
+        Group {
+            if let rich {
+                // Known code extension → four-class syntax highlighting
+                // (comments / strings / numbers / keywords), zero dependencies.
+                AttributedTextScrollView(text: rich)
+            } else {
+                PlainTextScrollView(text: text, fontSize: fontSize)
+            }
+        }
+        .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
         .safeAreaInset(edge: .bottom) {
             if truncated {
                 Text(L("Preview truncated", "미리보기가 잘렸습니다"))
@@ -30,17 +39,19 @@ struct TextFilePreview: View {
                     .background(.bar)
             }
         }
-        .task(id: url) {
-            let cap = byteCap
-            let loaded = await Task.detached(priority: .userInitiated) { () -> (String, Bool) in
+        .task(id: "\(url.path)|\(fontSize)") {
+            let cap = byteCap, ext = url.pathExtension, size = fontSize
+            let loaded = await Task.detached(priority: .userInitiated) { () -> (String, NSAttributedString?, Bool) in
                 guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
-                    return ("", false)
+                    return ("", nil, false)
                 }
                 let slice = data.prefix(cap)
-                return (String(decoding: slice, as: UTF8.self), data.count > cap)
+                let s = String(decoding: slice, as: UTF8.self)
+                return (s, CodeHighlight.highlight(s, ext: ext, fontSize: size), data.count > cap)
             }.value
             text = loaded.0
-            truncated = loaded.1
+            rich = loaded.1
+            truncated = loaded.2
         }
     }
 }

@@ -300,6 +300,13 @@ final class WorkspaceModel {
         restore()
         loadPinSnapshots()
         wireActivity()
+        // "previewTextSize" in the ⌘, settings file applies live on reload.
+        NotificationCenter.default.addObserver(
+            forName: Keymap.previewTextSizeChanged, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let size = note.object as? CGFloat else { return }
+            MainActor.assumeIsolated { self?.previewTextSize = size }
+        }
         // Index the focused folder's subtree (not all of home) so the first ⌘K is
         // instant and the scope follows the focused pane.
         FileIndex.shared.build(for: active.currentURL)

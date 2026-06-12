@@ -100,6 +100,22 @@ final class Keymap {
     private func load() {
         fileMTime = (try? FileManager.default.attributesOfItem(atPath: Self.fileURL.path)[.modificationDate]) as? Date
         bindings = Self.effectiveBindings(fileAt: Self.fileURL)
+        // Non-key settings live in the same file (it IS the ⌘, settings file).
+        // The file wins when edited; ⌘± keeps adjusting live in between.
+        if let size = Self.previewTextSize(fileAt: Self.fileURL) {
+            UserDefaults.standard.set(Double(size), forKey: "anf.previewTextSize")
+            NotificationCenter.default.post(name: Self.previewTextSizeChanged, object: size)
+        }
+    }
+
+    static let previewTextSizeChanged = Notification.Name("anf.settings.previewTextSize")
+
+    /// "previewTextSize": 18 in the settings file (9…28), or nil when absent.
+    nonisolated static func previewTextSize(fileAt url: URL) -> CGFloat? {
+        guard let data = try? Data(contentsOf: url),
+              let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let n = dict["previewTextSize"] as? Double, n >= 9, n <= 28 else { return nil }
+        return CGFloat(n)
     }
 
     /// Defaults overlaid with the user's file: an action listed in the file
@@ -223,12 +239,14 @@ final class Keymap {
         var lines: [String] = ["{"]
         lines.append("""
           "_readme": [
-            "anf keybindings — every line below IS the current binding; edit and switch back to anf to apply.",
-            "Modifiers: cmd shift opt ctrl, joined with +.  Keys: a-z 0-9 f1-f12 space return tab escape delete",
-            "up down left right home end pageup pagedown ` [ ] / \\\\ = - . , ; '",
+            "anf settings — every line below IS the current value; edit and switch back to anf to apply.",
+            "Keybindings — modifiers: cmd shift opt ctrl, joined with +.  Keys: a-z 0-9 f1-f12 space return tab",
+            "escape delete up down left right home end pageup pagedown ` [ ] / \\\\ = - . , ; '",
             "An action may have several chords (JSON array). Rebinding an action frees its old keys;",
-            "binding a key another action used steals it. Menu items keep showing the factory shortcut."
+            "binding a key another action used steals it. Menu items keep showing the factory shortcut.",
+            "previewTextSize — inspector text previews (markdown/json/code/document), 9-28. ⌘+/⌘− also adjusts it live."
           ],
+          "previewTextSize": 16,
         """)
         for (i, entry) in defaults.enumerated() {
             let (action, specs) = entry

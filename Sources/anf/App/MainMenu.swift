@@ -57,7 +57,7 @@ enum MainMenu {
         appMenu.addItem(.separator())
         // ⌘, the Ghostty way: no settings window — opens keybindings.json,
         // pre-filled with every current default binding.
-        let settings = appMenu.addItem(withTitle: L("Settings (Keybindings)…", "설정 (단축키)…"),
+        let settings = appMenu.addItem(withTitle: L("Settings…", "설정…"),
                                        action: #selector(SettingsMenuTarget.openSettings(_:)),
                                        keyEquivalent: ",")
         settings.target = SettingsMenuTarget.shared

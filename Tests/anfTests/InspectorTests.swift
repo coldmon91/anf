@@ -70,6 +70,42 @@ func runInspectorTests() {
             }
         }
 
+        T.group("CodeHighlight") {
+            func colors(_ src: String, _ ext: String) -> Int {
+                guard let rich = CodeHighlight.highlight(src, ext: ext, fontSize: 14) else { return 0 }
+                var set = Set<NSColor>()
+                rich.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: rich.length)) { v, _, _ in
+                    if let c = v as? NSColor { set.insert(c) }
+                }
+                return set.count
+            }
+            T.expect(CodeHighlight.lang(for: "sh") != nil, "sh recognized")
+            T.expect(CodeHighlight.lang(for: "ts") != nil, "ts recognized")
+            T.expect(CodeHighlight.lang(for: "java") != nil, "java recognized")
+            T.expect(CodeHighlight.lang(for: "css") != nil, "css recognized")
+            T.expect(CodeHighlight.lang(for: "txt") == nil, "txt stays plain")
+            T.expect(colors("#!/bin/sh\n# c\nif [ \"$x\" = 1 ]; then echo 2; fi", "sh") >= 4,
+                     "sh: comment/string/number/keyword all colored")
+            T.expect(colors("// c\nconst x: string = \"hi\"; let n = 42;", "ts") >= 4,
+                     "ts: four classes colored")
+            T.expect(colors("SELECT id FROM t WHERE x = 'a' -- c", "sql") >= 4,
+                     "sql: case-insensitive keywords")
+            let kept = CodeHighlight.highlight("let x = 1", ext: "swift", fontSize: 14)
+            T.equal(kept?.string, "let x = 1", "text content untouched")
+        }
+
+        T.group("settings file previewTextSize") {
+            let f = dir.appendingPathComponent("settings.json")
+            try? #"{"previewTextSize": 18, "newTab": "cmd+t"}"#.write(to: f, atomically: true, encoding: .utf8)
+            T.equal(Keymap.previewTextSize(fileAt: f), 18, "size read from the ⌘, file")
+            try? #"{"previewTextSize": 99}"#.write(to: f, atomically: true, encoding: .utf8)
+            T.expect(Keymap.previewTextSize(fileAt: f) == nil, "out-of-range ignored")
+            T.expect(Keymap.previewTextSize(fileAt: dir.appendingPathComponent("no.json")) == nil,
+                     "missing file → nil")
+            T.expect(Keymap.template.contains("\"previewTextSize\": 16"),
+                     "template pre-fills the setting")
+        }
+
         T.group("MarkdownBlocks.parse") {
             let src = """
             # Title
