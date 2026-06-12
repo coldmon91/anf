@@ -509,6 +509,18 @@ final class BrowserModel: Identifiable {
     @ObservationIgnored private var typeaheadKeys: [String] = []
     @ObservationIgnored private var typeaheadKeysVersion = -1
 
+    /// Lowercased + jamo-expanded keys for the current listing, index-aligned
+    /// with `items`. Shared by typeahead and the palette's local filter so the
+    /// per-keystroke work is a byte-wise `contains`, never a 26k Unicode
+    /// case-fold on the main thread.
+    func nameSearchKeys() -> [String] {
+        if typeaheadKeysVersion != itemsVersion {
+            typeaheadKeysVersion = itemsVersion
+            typeaheadKeys = items.map { HangulJamo.searchKey($0.name) }
+        }
+        return typeaheadKeys
+    }
+
     /// Finder's type-to-select: typing jumps the selection to the first item
     /// whose name starts with the typed prefix; quick successive keys accumulate
     /// ("pl" → "playground") and the buffer resets after a short pause. Korean
@@ -522,10 +534,7 @@ final class BrowserModel: Identifiable {
         guard !items.isEmpty else { return false }
         if now > typeaheadDeadline { typeahead = "" }
         typeaheadDeadline = now.addingTimeInterval(0.8)
-        if typeaheadKeysVersion != itemsVersion {
-            typeaheadKeysVersion = itemsVersion
-            typeaheadKeys = items.map { HangulJamo.searchKey($0.name) }
-        }
+        _ = nameSearchKeys()
 
         func select(_ i: Int) {
             selection = [items[i].id]

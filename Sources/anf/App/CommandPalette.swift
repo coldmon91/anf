@@ -380,19 +380,24 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
                 $0.name.localizedCaseInsensitiveContains(q)
                 || $0.url.path.localizedCaseInsensitiveContains(q)
             }
-            // Current-folder items: filter inline with a cheap non-localized
-            // compare and stop at the display cap. The old code built a Target for
-            // every item (26k allocations) then ran two locale-aware searches per
-            // item per keystroke on the main thread — a visible typing hitch in
-            // huge folders. The fd/index deep search covers anything missed here.
+            // Current-folder items: match against the precomputed jamo search
+            // keys (shared with typeahead) — a byte-wise `contains`, not a
+            // locale-aware case-fold per item. A sparse query used to scan all
+            // 26k names with `range(options: .caseInsensitive)` on the main
+            // thread every keystroke — a visible typing hitch. As a bonus the
+            // jamo keys make 초성 queries (ㄱㅊ) match here too.
+            let qKey = HangulJamo.searchKey(q)
+            let keys = workspace.active.nameSearchKeys()
+            let folderItems = workspace.active.items
             var folderMatches = 0
-            for item in workspace.active.items {
-                if folderMatches >= 60 { break }
-                guard item.name.range(of: q, options: .caseInsensitive) != nil else { continue }
-                folderMatches += 1
+            for i in keys.indices where keys[i].contains(qKey) {
+                guard i < folderItems.count else { break }
+                let item = folderItems[i]
                 filteredLocal.append(.init(name: item.name, url: item.url,
                                            symbol: item.isBrowsableContainer ? "folder" : "doc",
                                            isFile: !item.isBrowsableContainer))
+                folderMatches += 1
+                if folderMatches >= 60 { break }
             }
             // Filename matches first (local + fd/fzf), then a divider, then
             // ripgrep CONTENT matches. deepResults are already matched by the
@@ -574,18 +579,22 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         contentScanning = true
         updatePlaceholder()                    // start the footer scan ticker
         contentTask = Task { [weak self] in
-            let urls = await Task.detached(priority: .userInitiated) { () -> [URL] in
-                // ripgrep (text) → mdfind fallback, plus hwpx/docx body extraction.
+            // .utility, not .userInitiated: the extraction sweep can saturate
+            // every core for hundreds of ms — at a lower QoS the UI thread
+            // always preempts it, so typing stays smooth. Target construction
+            // (one stat per hit) also stays off the main thread here.
+            let targets = await Task.detached(priority: .utility) { () -> [Target] in
+                // ripgrep (text) → mdfind fallback, plus document body extraction.
                 let textHits = PaletteSearch.rgContent(root: root, needle: q, cap: 40)
                     ?? PaletteSearch.mdfindContent(root: root, needle: q, cap: 40)
                 let docHits = PaletteSearch.docContent(root: root, needle: q, cap: 25)
                 var seen = Set<String>()
-                return (textHits + docHits).filter {
-                    seen.insert($0.standardizedFileURL.path).inserted
-                }
+                return (textHits + docHits)
+                    .filter { seen.insert($0.standardizedFileURL.path).inserted }
+                    .map { Self.target(for: $0, content: true) }
             }.value
             guard let self, self.query == q else { return }
-            self.contentTargets = urls.map { Self.target(for: $0, content: true) }
+            self.contentTargets = targets
             self.searching = false
             self.contentScanning = false
             self.mergeDeep()
@@ -597,7 +606,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         recompute()
     }
 
-    private static func target(for url: URL, content: Bool) -> Target {
+    nonisolated private static func target(for url: URL, content: Bool) -> Target {
         let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
         return Target(
             name: url.lastPathComponent, url: url,
