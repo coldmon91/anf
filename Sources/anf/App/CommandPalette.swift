@@ -65,6 +65,11 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     private weak var anchorWindow: NSWindow?
     private var field: NSTextField!
     private var table: NSTableView!
+    private var resultsScroll: NSScrollView!     // toggled off in inline-answer mode
+    private var answerScroll: NSScrollView!      // the inline AI answer ("/…")
+    private var answerText: NSTextView!
+    private var inAnswerMode = false
+    private var askTask: Task<Void, Never>?
     private var results: [Target] = []
     private var deepResults: [Target] = []
     private var deepTask: Task<Void, Never>?
@@ -112,6 +117,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
 
         field.stringValue = ""
         deepResults = []
+        exitAnswerMode()                  // fresh open is always in search mode
         loadSSHTargets()
         recompute()
         position(over: host)
@@ -263,6 +269,36 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
             scroll.bottomAnchor.constraint(equalTo: blur.bottomAnchor, constant: -8),
             scroll.heightAnchor.constraint(equalToConstant: tableHeight),
         ])
+        resultsScroll = scroll
+
+        // Inline AI answer ("/…"): a selectable text view over the same area,
+        // shown instead of the table while answering — no separate window.
+        let aText = NSTextView()
+        aText.isEditable = false
+        aText.isSelectable = true
+        aText.drawsBackground = false
+        aText.textContainerInset = NSSize(width: 14, height: 12)
+        aText.font = .systemFont(ofSize: 15)
+        aText.textColor = .labelColor
+        let aScroll = NSScrollView()
+        aScroll.documentView = aText
+        aScroll.drawsBackground = false
+        aScroll.hasVerticalScroller = true
+        aScroll.autohidesScrollers = true
+        aScroll.isHidden = true
+        aScroll.translatesAutoresizingMaskIntoConstraints = false
+        aText.translatesAutoresizingMaskIntoConstraints = false
+        aText.widthAnchor.constraint(equalTo: aScroll.widthAnchor).isActive = true
+        blur.addSubview(aScroll)
+        NSLayoutConstraint.activate([
+            aScroll.leadingAnchor.constraint(equalTo: blur.leadingAnchor, constant: 8),
+            aScroll.trailingAnchor.constraint(equalTo: blur.trailingAnchor, constant: -8),
+            aScroll.topAnchor.constraint(equalTo: separator.bottomAnchor, constant: 6),
+            aScroll.bottomAnchor.constraint(equalTo: blur.bottomAnchor, constant: -8),
+            aScroll.heightAnchor.constraint(equalToConstant: tableHeight),
+        ])
+        answerScroll = aScroll
+        answerText = aText
 
         // Centered status: a spinner + text ("검색 중…" / "결과 없음") shown when
         // there are no rows yet.
@@ -664,12 +700,12 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         if t.aiSetup { openAISetupHelp(); hide(); return }
         if let question = t.askQuestion {
             if AIFeatures.enabled && LocalLLM.isAvailable {
-                FolderAITools.ask(url: t.url, name: t.url.lastPathComponent, isFolder: true,
-                                  initialQuestion: question.isEmpty ? nil : question)
+                if question.isEmpty { return }       // nothing typed after "/"
+                answerInline(question: question, folder: t.url)   // stays in the palette
             } else {
-                openAISetupHelp()
+                openAISetupHelp(); hide()
             }
-            hide(); return
+            return
         }
         if let viewID = t.viewID {
             if let v = workspace.savedViews.views.first(where: { $0.id == viewID }) {
@@ -679,6 +715,53 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         else if t.isFile { workspace.active.revealFile(t.url) }
         else { workspace.active.navigate(to: t.url) }
         hide()
+    }
+
+    // MARK: - Inline AI answer ("/…")
+
+    /// Answer a "/…" question right inside the palette — no separate window.
+    private func answerInline(question: String, folder: URL) {
+        enterAnswerMode()
+        setAnswer("✦ \(LocalLLM.providerLabel) · " + L("thinking…", "생각 중…"), dim: true)
+        askTask?.cancel()
+        askTask = Task { [weak self] in
+            let result = await Task.detached(priority: .userInitiated) {
+                AskService.context(for: folder, isFolder: true)
+            }.value
+            if Task.isCancelled { return }
+            if result.text.isEmpty {
+                self?.setAnswer(result.reason ?? L("Nothing to answer here.", "답할 내용이 없어요."), dim: true)
+                return
+            }
+            let answer = await AskService.answer(question: question, context: result.text)
+            if Task.isCancelled { return }
+            self?.setAnswer(answer.text, dim: false)
+        }
+    }
+
+    private func enterAnswerMode() {
+        inAnswerMode = true
+        resultsScroll?.isHidden = true
+        answerScroll?.isHidden = false
+        placeholder?.isHidden = true
+        scanLabel?.stringValue = ""
+        footer?.isHidden = true
+        spinner?.stopAnimation(nil)
+    }
+
+    /// Leave answer mode and return to normal search results.
+    private func exitAnswerMode() {
+        guard inAnswerMode else { return }
+        inAnswerMode = false
+        askTask?.cancel()
+        answerScroll?.isHidden = true
+        resultsScroll?.isHidden = false
+    }
+
+    private func setAnswer(_ text: String, dim: Bool) {
+        answerText?.string = text
+        answerText?.textColor = dim ? .secondaryLabelColor : .labelColor
+        answerText?.scrollToBeginningOfDocument(nil)
     }
 
     /// Open the AI setup guide (GitHub Pages), locale-aware.
@@ -694,6 +777,7 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
     // MARK: - NSTextFieldDelegate
 
     func controlTextDidChange(_ obj: Notification) {
+        exitAnswerMode()                  // editing the query leaves an inline answer
         let hasQuery = !query.isEmpty
         searching = hasQuery
         recompute()                       // local results instantly + placeholder
@@ -726,7 +810,9 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         case #selector(NSResponder.insertNewline(_:)):
             activateSelection(); return true
         case #selector(NSResponder.cancelOperation(_:)):
-            hide(); return true
+            // Esc backs out of an inline answer first, then closes the palette.
+            if inAnswerMode { exitAnswerMode() } else { hide() }
+            return true
         default:
             return false
         }
