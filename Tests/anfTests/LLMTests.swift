@@ -64,6 +64,14 @@ func runLLMTests() {
         T.expect(!LocalLLM.isKorean("{\"key\": 123, \"name\": \"value\"}"), "json/ascii → not Korean")
     }
 
+    T.group("CJK detection drives the tighter token budget") {
+        T.expect(LocalLLM.hasCJK("これは日本語の文書です"), "Japanese → CJK")
+        T.expect(LocalLLM.hasCJK("금융위원회 보고서"), "Korean → CJK")
+        T.expect(!LocalLLM.hasCJK("The quarterly report shows growth"), "English → not CJK")
+        T.expect(LocalLLM.inputBudget(forCJK: true) < LocalLLM.inputBudget(forCJK: false),
+                 "CJK budget is tighter than Latin")
+    }
+
     T.group("hasSummarizableText classification") {
         func item(_ name: String) -> FileItem? {
             let u = dir.appendingPathComponent(name)

@@ -81,6 +81,14 @@ final class BrowserModel: Identifiable {
     @ObservationIgnored private var selAnchor: Int?
     @ObservationIgnored private var selCursor: Int?
 
+    /// The moving end of a keyboard selection, if still in sync with the live
+    /// selection — the grid/table scrolls to follow THIS (not the topmost item),
+    /// so shift+↓ / shift+PgDn reveal the growing edge.
+    var selectionCursorIndex: Int? {
+        guard let c = selCursor, c < items.count, selection.contains(items[c].id) else { return nil }
+        return c
+    }
+
     /// Called whenever the user interacts here, so the owning pane can become active.
     @ObservationIgnored var onActivity: (() -> Void)?
 
