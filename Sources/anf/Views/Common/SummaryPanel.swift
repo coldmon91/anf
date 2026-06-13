@@ -31,7 +31,7 @@ final class SummaryPanel: NSObject {
     private init(title: String, key: String, run: @escaping () async -> String?) {
         self.key = key
         self.run = run
-        let w = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 320),
+        let w = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 520, height: 400),
                         styleMask: [.titled, .closable, .resizable, .utilityWindow],
                         backing: .buffered, defer: false)
         w.title = L("Summary — \(title)", "요약 — \(title)")
@@ -74,29 +74,29 @@ private struct SummaryPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles").foregroundStyle(.tint)
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles").font(.system(size: 16)).foregroundStyle(.tint)
                 Text(L("On-device summary", "온디바이스 요약"))
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 10)
+            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 12)
             Divider()
             if state.loading {
-                VStack(spacing: 10) {
-                    ProgressView().controlSize(.small)
+                VStack(spacing: 12) {
+                    ProgressView().controlSize(.regular)
                     Text(L("Summarizing on-device…", "온디바이스로 요약 중…"))
-                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                        .font(.system(size: 16)).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     Text(state.text)
-                        .font(.system(size: 15))
-                        .lineSpacing(3)
+                        .font(.system(size: 20, weight: .regular))
+                        .lineSpacing(6)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
+                        .padding(22)
                 }
             }
         }

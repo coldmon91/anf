@@ -273,9 +273,9 @@ private struct SummaryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
-                Image(systemName: "sparkles").font(.system(size: 11))
-                Text(L("Summary", "요약")).font(.system(size: 11, weight: .semibold))
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles").font(.system(size: 14))
+                Text(L("Summary", "요약")).font(.system(size: 14, weight: .bold))
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
@@ -291,12 +291,12 @@ private struct SummaryCard: View {
                 .padding(.vertical, 2)
             } else if let text {
                 ScrollView {
-                    Text(text).font(.system(size: max(fontSize, 14)))
-                        .lineSpacing(3)
+                    Text(text).font(.system(size: max(fontSize, 17)))
+                        .lineSpacing(5)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxHeight: 180)
+                .frame(maxHeight: 220)
             }
         }
         .padding(12)
