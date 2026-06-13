@@ -30,9 +30,23 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
 
     override init() {
         super.init()
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .otherMouseDown]) { [weak self] event in
             guard let self, self.workspace != nil else { return event }
+            if event.type == .otherMouseDown {
+                return self.handleMouse(event) ? nil : event
+            }
             return self.handle(event) ? nil : event
+        }
+    }
+
+    /// Mouse side buttons: button 3 → Back, button 4 → Forward (the de-facto
+    /// browser/Finder mapping). Other buttons pass through untouched.
+    private func handleMouse(_ e: NSEvent) -> Bool {
+        guard !isEditingText, !isTerminalFocused else { return false }
+        switch e.buttonNumber {
+        case 3: model.goBack(); refocusContent(); return true
+        case 4: model.goForward(); refocusContent(); return true
+        default: return false
         }
     }
 
