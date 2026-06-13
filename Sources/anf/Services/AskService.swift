@@ -43,12 +43,12 @@ enum AskService {
         return (body, nil)
     }
 
-    /// Answer one question against the context, fully on-device. Answers in the
-    /// question's language.
-    static func answer(question: String, context: String) async -> String {
-        guard LocalLLM.isAvailable else { return LocalLLM.unavailableHint(LocalLLM.status) }
+    /// Answer one question against the context. Returns the answer plus an
+    /// optional reasoning trace (shown collapsed as "Thought for…").
+    static func answer(question: String, context: String) async -> (text: String, reasoning: String?) {
+        guard LocalLLM.isAvailable else { return (LocalLLM.unavailableHint(LocalLLM.status), nil) }
         let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return "" }
+        guard !q.isEmpty else { return ("", nil) }
 
         // Answer in the question's language: Korean if the question is Korean,
         // or the OS is Korean and the question isn't clearly English.
@@ -61,9 +61,10 @@ enum AskService {
             ? "주어진 문서 내용만을 근거로 질문에 한국어로 정확하고 간결하게 답하세요. 문서에 없는 내용이면 '문서에 없습니다'라고 답하세요. 반드시 한국어로만 답하세요."
             : "Answer the question using ONLY the document content below. Be accurate and concise. If the answer isn't in the document, say it isn't there."
         let prompt = "문서:\n\(clipped)\n\n질문: \(q)"
-        return await LocalLLM.generate(instructions: instructions, prompt: prompt, maxTokens: 500)
-            ?? L("The on-device model couldn’t answer that — try rephrasing.",
-                 "온디바이스 모델이 답하지 못했어요 — 질문을 바꿔보세요.")
+        let reply = await LocalLLM.reply(instructions: instructions, prompt: prompt, maxTokens: 500)
+        let text = reply.text ?? L("The on-device model couldn’t answer that — try rephrasing.",
+                                   "온디바이스 모델이 답하지 못했어요 — 질문을 바꿔보세요.")
+        return (text, reply.reasoning)
     }
 
     /// Rough "is this English?" check to keep an English question in English even

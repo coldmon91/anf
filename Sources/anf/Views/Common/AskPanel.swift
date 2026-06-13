@@ -48,7 +48,9 @@ extension AskPanel: NSWindowDelegate {
 private struct QA: Identifiable {
     let id = UUID()
     let question: String
-    var answer: String?     // nil while generating
+    var answer: String?       // nil while generating
+    var reasoning: String?    // model's "thinking", shown collapsed
+    var seconds: Double?      // wall-clock for this answer
 }
 
 @MainActor
@@ -82,8 +84,13 @@ private final class AskState: ObservableObject {
         turns.append(QA(question: q, answer: nil))
         let ctx = contextText
         Task {
-            let a = await AskService.answer(question: q, context: ctx)
-            if idx < turns.count { turns[idx].answer = a }
+            let started = Date()
+            let r = await AskService.answer(question: q, context: ctx)
+            if idx < turns.count {
+                turns[idx].answer = r.text
+                turns[idx].reasoning = r.reasoning
+                turns[idx].seconds = Date().timeIntervalSince(started)
+            }
             answering = false
         }
     }
@@ -97,8 +104,12 @@ private struct AskPanelView: View {
             HStack(spacing: 8) {
                 Image(systemName: "bubble.left.and.text.bubble.right")
                     .font(.system(size: 15)).foregroundStyle(.tint)
-                Text(L("Ask the on-device AI", "온디바이스 AI에게 질문"))
-                    .font(.system(size: 14, weight: .bold)).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(L("Ask the AI", "AI에게 질문"))
+                        .font(.system(size: 14, weight: .bold)).foregroundStyle(.secondary)
+                    Text(LocalLLM.providerLabel)
+                        .font(.system(size: 10)).foregroundStyle(.tertiary)
+                }
                 if state.loadingContext {
                     ProgressView().controlSize(.small).padding(.leading, 2)
                 }
@@ -171,16 +182,55 @@ private struct TurnView: View {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "sparkles").font(.system(size: 13)).foregroundStyle(.tint).frame(width: 18)
                 if let a = turn.answer {
-                    Text(a).font(.system(size: 15)).lineSpacing(4).textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let r = turn.reasoning, !r.isEmpty {
+                            ThoughtView(reasoning: r, seconds: turn.seconds)
+                        }
+                        Text(a).font(.system(size: 15)).lineSpacing(4).textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 } else {
                     HStack(spacing: 7) {
                         ProgressView().controlSize(.small)
-                        Text(L("Thinking…", "생각 중…")).font(.system(size: 13)).foregroundStyle(.secondary)
+                        Text(L("Thinking via \(LocalLLM.providerLabel)…", "\(LocalLLM.providerLabel) 로 생각 중…"))
+                            .font(.system(size: 13)).foregroundStyle(.secondary)
                     }
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Collapsible "Thought for X.Xs" — the model's reasoning, hidden by default so
+/// the user can confirm their question landed without the noise.
+private struct ThoughtView: View {
+    let reasoning: String
+    let seconds: Double?
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button { withAnimation(.easeInOut(duration: 0.12)) { expanded.toggle() } } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                    Text(seconds.map { L("Thought for \(String(format: "%.1f", $0)) seconds", "\(String(format: "%.1f", $0))초 동안 생각함") }
+                         ?? L("Thought process", "사고 과정"))
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            if expanded {
+                Text(reasoning)
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                    .lineSpacing(2).textSelection(.enabled)
+                    .padding(.leading, 13)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
     }
 }

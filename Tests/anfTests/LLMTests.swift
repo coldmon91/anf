@@ -53,6 +53,14 @@ func runLLMTests() {
         T.equal(ClaudeLLM.defaultModel, "claude-opus-4-8", "Claude default is Opus 4.8")
     }
 
+    T.group("RemoteLLM.stripThink removes inline reasoning") {
+        T.equal(RemoteLLM.stripThink("<think>hmm let me see</think>The answer is 42."),
+                "The answer is 42.", "strips a <think> block")
+        T.equal(RemoteLLM.stripThink("plain answer"), "plain answer", "leaves plain text")
+        T.equal(RemoteLLM.stripThink("<think>unterminated reasoning"), "",
+                "drops an unterminated <think> tail")
+    }
+
     T.group("SummaryService.bodyText reads text files") {
         let md = dir.appendingPathComponent("note.md")
         try? "# Title\n\nBody text here.".write(to: md, atomically: true, encoding: .utf8)

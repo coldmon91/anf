@@ -80,17 +80,21 @@ private struct SummaryPanelView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles").font(.system(size: 16)).foregroundStyle(.tint)
-                Text(L("On-device summary", "온디바이스 요약"))
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(L("Summary", "요약"))
+                        .font(.system(size: 15, weight: .bold)).foregroundStyle(.secondary)
+                    Text(LocalLLM.providerLabel)
+                        .font(.system(size: 10)).foregroundStyle(.tertiary)
+                }
             }
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 12)
             Divider()
             if state.loading {
                 VStack(spacing: 12) {
                     ProgressView().controlSize(.regular)
-                    Text(L("Summarizing on-device…", "온디바이스로 요약 중…"))
+                    Text(L("Summarizing via \(LocalLLM.providerLabel)…", "\(LocalLLM.providerLabel) 로 요약 중…"))
                         .font(.system(size: 16)).foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {

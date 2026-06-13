@@ -37,7 +37,13 @@ enum RemoteLLM {
 
     /// POST a chat completion. Returns the assistant text, or nil on any error.
     static func generate(instructions: String, prompt: String, maxTokens: Int, temperature: Double = 0.3) async -> String? {
-        guard let base = endpoint, let url = chatURL(base) else { return nil }
+        await request(instructions: instructions, prompt: prompt, maxTokens: maxTokens, temperature: temperature).text
+    }
+
+    /// Like `generate`, but also returns the model's reasoning trace when the
+    /// server provides one (LM Studio's `reasoning_content`, or inline <think>).
+    static func request(instructions: String, prompt: String, maxTokens: Int, temperature: Double = 0.3) async -> (text: String?, reasoning: String?) {
+        guard let base = endpoint, let url = chatURL(base) else { return (nil, nil) }
         // Reasoning models (LM Studio splits thinking into `reasoning_content`)
         // spend the completion budget THINKING — too small a cap and the real
         // answer is truncated to "". Local inference is free, so give headroom.
@@ -52,7 +58,7 @@ enum RemoteLLM {
             "max_tokens": cap,
             "stream": false,
         ]
-        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return (nil, nil) }
 
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -66,10 +72,20 @@ enum RemoteLLM {
               let json = (try? JSONSerialization.jsonObject(with: respData)) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]], let first = choices.first,
               let message = first["message"] as? [String: Any]
-        else { return nil }
+        else { return (nil, nil) }
         let raw = (message["content"] as? String) ?? ""
+        // Reasoning: a dedicated field, or whatever was inside <think>…</think>.
+        var reasoning = (message["reasoning_content"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if reasoning?.isEmpty != false { reasoning = thinkBlock(raw) }
         let cleaned = stripThink(raw).trimmingCharacters(in: .whitespacesAndNewlines)
-        return cleaned.isEmpty ? nil : cleaned
+        return (cleaned.isEmpty ? nil : cleaned, (reasoning?.isEmpty == false) ? reasoning : nil)
+    }
+
+    /// The text inside the first <think>…</think>, if any.
+    private static func thinkBlock(_ s: String) -> String? {
+        guard let open = s.range(of: "<think>"),
+              let close = s.range(of: "</think>", range: open.upperBound..<s.endIndex) else { return nil }
+        return String(s[open.upperBound..<close.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Some models inline chain-of-thought as <think>…</think> in `content`;

@@ -100,22 +100,35 @@ enum LocalLLM {
         }
     }
 
+    /// A model reply with an optional reasoning trace (for "Thought for…" UI).
+    struct Reply: Sendable { var text: String?; var reasoning: String? }
+
     /// Generate text from instructions + prompt via the active provider. Returns
     /// nil if unavailable or the backend errors. `maxTokens` bounds the response.
     static func generate(instructions: String, prompt: String, maxTokens: Int = 600) async -> String? {
+        await reply(instructions: instructions, prompt: prompt, maxTokens: maxTokens).text
+    }
+
+    /// Like `generate`, but also surfaces the model's reasoning when available.
+    static func reply(instructions: String, prompt: String, maxTokens: Int = 600) async -> Reply {
         switch provider {
         case .claude:
-            // Big context — one shot is enough.
-            return await ClaudeLLM.generate(instructions: instructions, prompt: prompt, maxTokens: maxTokens)
+            let t = await ClaudeLLM.generate(instructions: instructions, prompt: prompt, maxTokens: maxTokens)
+            return Reply(text: t, reasoning: nil)
         case .local:
-            // Small local models can overflow too — shrink-and-retry like Apple.
-            return await shrinkRetry(prompt) { input in
-                await RemoteLLM.generate(instructions: instructions, prompt: input, maxTokens: maxTokens)
+            var input = prompt, reasoning: String?
+            for i in 0..<3 {
+                let r = await RemoteLLM.request(instructions: instructions, prompt: input, maxTokens: maxTokens)
+                reasoning = r.reasoning ?? reasoning
+                if let t = r.text { return Reply(text: t, reasoning: reasoning) }
+                if i < 2, input.count > 600 { input = String(input.prefix(input.count / 2)) } else { break }
             }
+            return Reply(text: nil, reasoning: reasoning)
         case .apple:
-            return await shrinkRetry(prompt) { input in
+            let t = await shrinkRetry(prompt) { input in
                 await appleGenerate(instructions: instructions, prompt: input, maxTokens: maxTokens)
             }
+            return Reply(text: t, reasoning: nil)
         }
     }
 
