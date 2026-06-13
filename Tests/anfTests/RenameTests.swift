@@ -74,6 +74,19 @@ func runRenameTests() {
         T.equal(plan.total, 6, "unknown extension is not moved")
     }
 
+    T.group("TagService.parse cleans the model's tag reply") {
+        T.equal(TagService.parse("invoice, finance, 2026"), ["invoice", "finance", "2026"],
+                "comma-separated tags")
+        T.equal(TagService.parse("#계약서\n법무\n#계약서"), ["계약서", "법무"],
+                "strips #, splits newlines, dedupes")
+        T.equal(TagService.parse("invoice, document, image, taxes").count, 2,
+                "drops generic words (document/image), keeps invoice+taxes")
+        T.equal(TagService.parse("a, b, c, d, e").count, 3, "capped at maxTags (3)")
+        T.expect(TagService.parse("   ").isEmpty, "blank → no tags")
+        T.expect(TagService.parse("ThisTagIsWayTooLongToBeUsefulAsATag").isEmpty,
+                 "over-long single token dropped")
+    }
+
     T.group("ContentOrganizer matches model replies to the taxonomy") {
         let opts = ["Receipts & Invoices", "Reports", "Other"]
         T.equal(ContentOrganizer.match("Reports", in: opts), "Reports", "exact match")

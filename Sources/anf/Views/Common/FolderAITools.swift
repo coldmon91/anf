@@ -72,6 +72,37 @@ enum FolderAITools {
         }
     }
 
+    /// AI auto-tag: suggest topic tags for specific files, reviewed in a panel.
+    static func autoTag(_ urls: [URL], title: String, model: BrowserModel) {
+        guard ensureLLM() else { return }
+        TagPanel.show(title: L("Auto-Tag — \(title)", "자동 태그 — \(title)"), urls: urls) { model.reload() }
+    }
+
+    /// AI auto-tag every taggable file in a folder.
+    static func autoTagFolder(folder: URL, model: BrowserModel) {
+        guard ensureLLM() else { return }
+        Task {
+            let urls = await Task.detached(priority: .userInitiated) {
+                ContentOrganizer.candidates(in: folder)   // readable docs + images
+            }.value
+            guard !urls.isEmpty else {
+                alert(L("Nothing to tag", "태그할 파일이 없어요"),
+                      L("No readable files to tag here.", "이 폴더에는 태그할 수 있는 파일이 없어요."))
+                return
+            }
+            let capped = urls.count > ContentOrganizer.maxFiles
+            let use = capped ? Array(urls.prefix(ContentOrganizer.maxFiles)) : urls
+            if capped {
+                alert(L("Large folder", "파일이 많아요"),
+                      L("Tagging the first \(use.count) of \(urls.count) files.",
+                        "\(urls.count)개 중 처음 \(use.count)개만 태그합니다."))
+            }
+            TagPanel.show(title: L("Auto-Tag — \(folder.lastPathComponent)",
+                                   "자동 태그 — \(folder.lastPathComponent)"),
+                          urls: use) { model.reload() }
+        }
+    }
+
     /// Organize a folder by file KIND (Images/Documents/Archives/…). Instant,
     /// no LLM. Confirms the plan first.
     static func organizeByKind(folder: URL, model: BrowserModel) {

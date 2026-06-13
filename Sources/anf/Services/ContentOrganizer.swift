@@ -55,8 +55,8 @@ enum ContentOrganizer {
         let opts = names()
         let list = opts.joined(separator: ", ")
         let instructions = L10n.isKorean
-            ? "파일 내용을 보고 아래 분류 중 정확히 하나를 고르세요. 분류 이름만 그대로 출력하고 다른 말은 하지 마세요.\n분류: \(list)"
-            : "Pick exactly ONE category for this file from the list. Output only the category name, nothing else.\nCategories: \(list)"
+            ? "파일 내용을 보고 아래 분류 중 정확히 하나를 고르세요. 분류 이름만 그대로 출력하고 다른 말은 하지 마세요. 명확히 맞는 분류가 없을 때만 '기타'를 고르세요.\n분류: \(list)"
+            : "Pick exactly ONE category for this file from the list. Output only the category name, nothing else. Use 'Other' only when nothing else clearly fits.\nCategories: \(list)"
         let reply = await LocalLLM.generate(instructions: instructions, prompt: signal, maxTokens: 16)
         return match(reply, in: opts) ?? otherName
     }
@@ -72,23 +72,15 @@ enum ContentOrganizer {
     }
 
     /// Build a signal string for classification (short — a category needs less
-    /// than a summary).
+    /// than a summary). Always includes the file name so even an unreadable file
+    /// can be placed by its name; content (OCR-leading for images) via the shared
+    /// extractor.
     private static func signalText(for url: URL) -> String? {
-        let name = url.lastPathComponent
-        if OCRService.isImage(url) {
-            var parts = ["File name: \(name)"]
-            if let ocr = OCRService.recognizeText(in: url, fast: true)?
-                .trimmingCharacters(in: .whitespacesAndNewlines), !ocr.isEmpty {
-                parts.append(String(ocr.prefix(500)))
-            }
-            let labels = ImageClassifier.labels(for: url)
-            if !labels.isEmpty { parts.append("Visual: " + labels.prefix(6).joined(separator: ", ")) }
-            return parts.joined(separator: "\n")
+        let name = "File name: \(url.lastPathComponent)"
+        if let content = ContentSignal.text(for: url, maxChars: 1_500) {
+            return name + "\n" + content
         }
-        if let body = SummaryService.bodyText(for: url) {
-            return "File name: \(name)\n" + String(body.prefix(1_500))
-        }
-        return "File name: \(name)"
+        return name
     }
 
     /// Move classified files into their category folders (off the main thread).

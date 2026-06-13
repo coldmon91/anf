@@ -45,9 +45,11 @@ enum FileItemMenu {
                 add(L("Summarize (AI)", "AI 요약")) { FolderAITools.summarizeFile(item.url, name: item.name) }
                 add(L("Ask… (AI)", "질문하기… (AI)")) { FolderAITools.ask(url: item.url, name: item.name, isFolder: false) }
                 add(L("Suggest Name (AI)", "AI 이름 제안")) { FolderAITools.suggestNames([item.url], title: item.name, model: model) }
+                add(L("Auto-Tag (AI)", "AI 태그 추가")) { FolderAITools.autoTag(taggableSelection(item, model), title: item.name, model: model) }
             } else if OCRService.isImage(item.url) {
                 menu.addItem(.separator())
                 add(L("Suggest Name (AI)", "AI 이름 제안")) { FolderAITools.suggestNames([item.url], title: item.name, model: model) }
+                add(L("Auto-Tag (AI)", "AI 태그 추가")) { FolderAITools.autoTag(taggableSelection(item, model), title: item.name, model: model) }
             } else if item.isBrowsableContainer {
                 menu.addItem(.separator())
                 add(L("Summarize Folder (AI)", "이 폴더 요약 (AI)")) {
@@ -135,6 +137,7 @@ enum FileItemMenu {
         add(L("Tidy Screenshots", "스크린샷 정리")) { FolderAITools.tidyScreenshots(folder: folder, model: model) }
         add(L("Organize by Kind", "종류별 정리")) { FolderAITools.organizeByKind(folder: folder, model: model) }
         add(L("Organize by Content (AI)", "내용별 정리 (AI)")) { FolderAITools.organizeByContent(folder: folder, model: model) }
+        add(L("Auto-Tag Folder (AI)", "폴더 자동 태그 (AI)")) { FolderAITools.autoTagFolder(folder: folder, model: model) }
         menu.addItem(.separator())
         // Vault: time-travel protection for this folder.
         if VaultWatcher.shared.isVault(model.currentURL) {
@@ -155,5 +158,17 @@ enum FileItemMenu {
             model.showHidden.toggle()
         }
         return menu
+    }
+
+    /// URLs to auto-tag: the whole selection when multiple taggable files are
+    /// selected, otherwise just the clicked item.
+    private static func taggableSelection(_ item: FileItem, _ model: BrowserModel) -> [URL] {
+        if model.selection.count > 1 {
+            let urls = model.selectedItems
+                .filter { $0.hasSummarizableText || OCRService.isImage($0.url) }
+                .map(\.url)
+            if !urls.isEmpty { return urls }
+        }
+        return [item.url]
     }
 }

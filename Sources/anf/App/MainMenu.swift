@@ -67,6 +67,11 @@ final class ToolsMenuController: NSObject, NSMenuItemValidation {
         FolderAITools.ask(url: m.currentURL, name: m.currentURL.lastPathComponent, isFolder: true)
     }
 
+    @objc func autoTagFolder(_ sender: Any?) {
+        guard let m = model else { return }
+        FolderAITools.autoTagFolder(folder: m.currentURL, model: m)
+    }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool { model != nil }
 }
 
@@ -163,6 +168,10 @@ enum MainMenu {
                                           action: #selector(ToolsMenuController.organizeByContent(_:)),
                                           keyEquivalent: "")
         byContent.target = ToolsMenuController.shared
+        let autoTag = toolsMenu.addItem(withTitle: L("Auto-Tag Folder (AI)", "폴더 자동 태그 (AI)"),
+                                        action: #selector(ToolsMenuController.autoTagFolder(_:)),
+                                        keyEquivalent: "")
+        autoTag.target = ToolsMenuController.shared
         let tidy = toolsMenu.addItem(withTitle: L("Tidy Screenshots", "스크린샷 정리"),
                                      action: #selector(ToolsMenuController.tidyScreenshots(_:)),
                                      keyEquivalent: "")
