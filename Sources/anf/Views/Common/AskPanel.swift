@@ -9,11 +9,16 @@ import SwiftUI
 final class AskPanel: NSObject {
     private static var open: [String: AskPanel] = [:]
 
-    static func show(title: String, key: String, url: URL, isFolder: Bool) {
-        if let existing = open[key] { existing.window.makeKeyAndOrderFront(nil); return }
+    static func show(title: String, key: String, url: URL, isFolder: Bool, initialQuestion: String? = nil) {
+        if let existing = open[key] {
+            existing.window.makeKeyAndOrderFront(nil)
+            if let q = initialQuestion, !q.isEmpty { existing.state.ask(q) }
+            return
+        }
         let p = AskPanel(title: title, key: key, url: url, isFolder: isFolder)
         open[key] = p
         p.window.makeKeyAndOrderFront(nil)
+        p.state.pendingQuestion = initialQuestion
         p.state.loadContext(url: url, isFolder: isFolder)
     }
 
@@ -60,9 +65,13 @@ private final class AskState: ObservableObject {
     @Published var loadingContext = true
     @Published var contextReason: String?   // non-nil → can't ask
     @Published var answering = false
+    var pendingQuestion: String?            // seeded from ⌘K "/…"; asked once context loads
     private var contextText = ""
 
     var canAsk: Bool { !loadingContext && contextReason == nil && !answering }
+
+    /// Set the field and submit (used to auto-ask a seeded question).
+    func ask(_ q: String) { input = q; submit() }
 
     func loadContext(url: URL, isFolder: Bool) {
         Task {
@@ -72,6 +81,10 @@ private final class AskState: ObservableObject {
             contextText = result.text
             contextReason = result.text.isEmpty ? (result.reason ?? "") : nil
             loadingContext = false
+            if contextReason == nil, let q = pendingQuestion, !q.isEmpty {
+                pendingQuestion = nil
+                ask(q)
+            }
         }
     }
 

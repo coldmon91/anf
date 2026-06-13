@@ -23,6 +23,23 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         var sshHost: String? = nil
         /// When set, activating this row applies the saved Workspace.
         var viewID: UUID? = nil
+        /// When set, activating this row opens the Ask panel for `url` (folder),
+        /// seeded with this question. Empty string = open with no question.
+        var askQuestion: String? = nil
+        /// When true, activating this row opens the settings file to set up AI.
+        var aiSetup = false
+
+        static func ask(question: String, folder: URL) -> Target {
+            Target(name: question, url: folder, symbol: "sparkles", isFile: false,
+                   askQuestion: question)
+        }
+
+        static func setupAI() -> Target {
+            Target(name: L("Set up AI — connect Claude, a local model, or Apple",
+                           "AI 설정하기 — Claude·로컬·Apple 연결"),
+                   url: URL(fileURLWithPath: "/__aisetup__"), symbol: "gearshape",
+                   isFile: false, aiSetup: true)
+        }
 
         static func divider(_ title: String) -> Target {
             Target(name: title, url: URL(fileURLWithPath: "/"), symbol: "",
@@ -335,6 +352,23 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         guard let workspace else { results = []; table?.reloadData(); return }
         let q = query
 
+        // "/" → Ask-AI mode. '/' can't appear in a filename, so this never
+        // shadows a file search. Configured users ask immediately; others see
+        // the feature plus a one-tap link to the setup guide.
+        if q.hasPrefix("/") {
+            let question = String(q.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+            let folder = workspace.active.currentURL
+            if AIFeatures.enabled && LocalLLM.isAvailable {
+                results = [.ask(question: question, folder: folder)]
+            } else {
+                results = [.ask(question: question, folder: folder), .setupAI()]
+            }
+            table?.reloadData()
+            selectFirstSelectableRow()
+            updatePlaceholder()
+            return
+        }
+
         if q.isEmpty {
             // Empty state order: pinned → Workspace → recently visited →
             // built-in favorites → SSH.
@@ -627,6 +661,16 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         guard results.indices.contains(row), !results[row].isDivider,
               let workspace else { return }
         let t = results[row]
+        if t.aiSetup { openAISetupHelp(); hide(); return }
+        if let question = t.askQuestion {
+            if AIFeatures.enabled && LocalLLM.isAvailable {
+                FolderAITools.ask(url: t.url, name: t.url.lastPathComponent, isFolder: true,
+                                  initialQuestion: question.isEmpty ? nil : question)
+            } else {
+                openAISetupHelp()
+            }
+            hide(); return
+        }
         if let viewID = t.viewID {
             if let v = workspace.savedViews.views.first(where: { $0.id == viewID }) {
                 workspace.applyView(v)
@@ -635,6 +679,13 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         else if t.isFile { workspace.active.revealFile(t.url) }
         else { workspace.active.navigate(to: t.url) }
         hide()
+    }
+
+    /// Open the AI setup guide (GitHub Pages), locale-aware.
+    private func openAISetupHelp() {
+        let base = "https://rescenedev.github.io/anf/"
+        let url = URL(string: L10n.isKorean ? base + "ai.html" : base + "en/ai.html")
+        if let url { NSWorkspace.shared.open(url) }
     }
 
     @objc private func rowClicked() { activateSelection() }   // single click opens
@@ -647,6 +698,12 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         searching = hasQuery
         recompute()                       // local results instantly + placeholder
         debounce?.cancel()
+        // Ask-AI mode ("/…") doesn't search the filesystem.
+        if query.hasPrefix("/") {
+            deepTask?.cancel(); contentTask?.cancel()
+            searching = false; contentScanning = false
+            return
+        }
         guard hasQuery else {
             deepTask?.cancel(); contentTask?.cancel()
             nameTargets = []; contentTargets = []

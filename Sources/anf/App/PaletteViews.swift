@@ -80,8 +80,16 @@ final class PaletteRowView: NSTableCellView {
 
     func configure(with t: CommandPaletteController.Target) {
         icon.image = NSImage(systemSymbolName: t.symbol, accessibilityDescription: nil)
+        if let question = t.askQuestion {
+            icon.contentTintColor = .controlAccentColor
+            title.stringValue = question.isEmpty ? L("Ask the AI…", "AI에게 질문…") : question
+            subtitle.stringValue = "\(t.url.lastPathComponent) · \(LocalLLM.providerLabel)"
+            return
+        }
+        icon.contentTintColor = t.aiSetup ? .controlAccentColor : .secondaryLabelColor
         title.stringValue = t.name
-        subtitle.stringValue = t.url.deletingLastPathComponent().path
+        subtitle.stringValue = t.aiSetup ? L("Open setup guide", "설정 가이드 열기")
+                                         : t.url.deletingLastPathComponent().path
     }
 }
 

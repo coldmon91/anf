@@ -20,11 +20,12 @@ enum FolderAITools {
         }
     }
 
-    /// Open a Q&A panel for a file or a folder.
-    static func ask(url: URL, name: String, isFolder: Bool) {
+    /// Open a Q&A panel for a file or a folder, optionally seeded with a question
+    /// (from ⌘K "/…") that's asked as soon as the context loads.
+    static func ask(url: URL, name: String, isFolder: Bool, initialQuestion: String? = nil) {
         guard ensureLLM() else { return }
         AskPanel.show(title: name, key: (isFolder ? "askfolder:" : "ask:") + url.path,
-                      url: url, isFolder: isFolder)
+                      url: url, isFolder: isFolder, initialQuestion: initialQuestion)
     }
 
     /// AI-suggest names for specific files, reviewed in a panel.
