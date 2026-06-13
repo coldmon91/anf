@@ -164,7 +164,12 @@ struct FileListView: NSViewRepresentable {
                 syncState.applying {
                     table.selectRowIndexes(want, byExtendingSelection: false)
                 }
-                if scroll, let first = want.first { table.scrollRowToVisible(first) }
+                // Follow the moving cursor (the growing edge of a shift-select),
+                // not the topmost row — otherwise shift+↓ / shift+PgDn never
+                // scroll because the top stays put. Fall back to the topmost.
+                if scroll, let target = model.selectionCursorIndex ?? want.first {
+                    table.scrollRowToVisible(target)
+                }
             }
         }
 
