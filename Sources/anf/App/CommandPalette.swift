@@ -295,12 +295,12 @@ final class CommandPaletteController: NSObject, NSTextFieldDelegate,
         aText.font = .systemFont(ofSize: 15)
         aText.textColor = .labelColor
         aText.minSize = NSSize(width: 0, height: 0)
-        aText.maxSize = NSSize(width: .greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
+        aText.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         aText.isVerticallyResizable = true
         aText.isHorizontallyResizable = false
         aText.autoresizingMask = [.width]
         aText.textContainer?.widthTracksTextView = true
-        aText.textContainer?.containerSize = NSSize(width: panelWidth - 16, height: .greatestFiniteMagnitude)
+        aText.textContainer?.containerSize = NSSize(width: panelWidth - 16, height: CGFloat.greatestFiniteMagnitude)
         aScroll.documentView = aText
         blur.addSubview(aScroll)
         NSLayoutConstraint.activate([
