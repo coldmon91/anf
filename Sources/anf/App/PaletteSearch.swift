@@ -142,8 +142,14 @@ enum PaletteSearch {
             lock.lock(); let enough = matched.count >= cap; lock.unlock()
             if enough { return }
             let url = files[i]
-            guard let text = OCRTextCache.shared.text(for: url) else { return }
-            if text.localizedCaseInsensitiveContains(needle) {
+            // Visual match first (classification is cheap): "강아지"/"dog" etc.
+            let labels = ImageLabelCache.shared.labels(for: url)
+            var hit = ImageClassifier.matches(query: needle, labels: labels)
+            // Then text match (OCR is the expensive part): "환불", "Invoice"…
+            if !hit, let text = OCRTextCache.shared.text(for: url) {
+                hit = text.localizedCaseInsensitiveContains(needle)
+            }
+            if hit {
                 lock.lock(); if matched.count < cap { matched.append(url) }; lock.unlock()
             }
         }

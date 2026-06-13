@@ -67,6 +67,18 @@ func runOCRTests() {
                  "OCR'd image matched by its text content")
     }
 
+    T.group("ImageClassifier query matching (Korean aliases + English)") {
+        let labels = ["labrador retriever", "dog", "domestic animal", "pet"]
+        T.expect(ImageClassifier.matches(query: "강아지", labels: labels), "강아지 → dog labels")
+        T.expect(ImageClassifier.matches(query: "개", labels: labels), "개 → dog")
+        T.expect(ImageClassifier.matches(query: "dog", labels: labels), "English query direct")
+        T.expect(ImageClassifier.matches(query: "retriever", labels: labels), "substring of a label")
+        T.expect(!ImageClassifier.matches(query: "고양이", labels: labels), "고양이 ≠ dog image")
+        T.expect(!ImageClassifier.matches(query: "강아지", labels: []), "no labels → no match")
+        T.expect(ImageClassifier.matches(query: "음식", labels: ["food", "dish"]), "음식 → food")
+        T.expect(ImageClassifier.matches(query: "문서", labels: ["document", "text"]), "문서 → document")
+    }
+
     T.group("imageFiles walk: bounded, recursive, skips non-images") {
         let sub = dir.appendingPathComponent("nested/deep")
         try? fm.createDirectory(at: sub, withIntermediateDirectories: true)
