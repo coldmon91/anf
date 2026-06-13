@@ -12,13 +12,45 @@ func runLLMTests() {
 
     T.group("LocalLLM availability gating") {
         // Whatever the machine reports, status maps to a stable hint and
-        // isAvailable agrees with .available.
+        // isAvailable tracks the "usable" states.
         let s = LocalLLM.status
-        T.equal(LocalLLM.isAvailable, s == .available, "isAvailable tracks status")
-        if s != .available {
+        let usable: Set<LocalLLM.Status> = [.available, .customEndpoint, .claudeCloud]
+        T.equal(LocalLLM.isAvailable, usable.contains(s), "isAvailable tracks usable states")
+        if !usable.contains(s) {
             T.expect(!LocalLLM.unavailableHint(s).isEmpty, "unavailable states carry a hint")
         }
         T.equal(LocalLLM.unavailableHint(.available), "", "available has no hint")
+    }
+
+    T.group("LLM provider routing") {
+        let d = UserDefaults.standard
+        let keys = ["anf.aiProvider", "anf.aiEndpoint", "anf.aiModel", "anf.aiApiKey"]
+        let saved = keys.map { d.string(forKey: $0) }
+        defer { for (k, v) in zip(keys, saved) { d.set(v, forKey: k) } }
+
+        keys.forEach { d.removeObject(forKey: $0) }
+        T.equal(LocalLLM.provider, .apple, "no config → Apple on-device")
+
+        d.set("http://localhost:11434/v1", forKey: "anf.aiEndpoint")
+        d.set("local", forKey: "anf.aiProvider")
+        T.equal(LocalLLM.provider, .local, "endpoint + local → local")
+        T.expect(RemoteLLM.isConfigured, "endpoint set → RemoteLLM configured")
+
+        d.set("claude", forKey: "anf.aiProvider")
+        d.set("sk-ant-test", forKey: "anf.aiApiKey")
+        T.equal(LocalLLM.provider, .claude, "key + claude → claude")
+        T.equal(LocalLLM.status, .claudeCloud, "claude provider → cloud status")
+        T.expect(LocalLLM.isAvailable, "configured cloud provider is available")
+    }
+
+    T.group("RemoteLLM.chatURL normalizes endpoints") {
+        T.equal(RemoteLLM.chatURL("http://localhost:11434/v1")?.absoluteString,
+                "http://localhost:11434/v1/chat/completions", "appends path to /v1 base")
+        T.equal(RemoteLLM.chatURL("localhost:1234")?.absoluteString,
+                "http://localhost:1234/v1/chat/completions", "bare host → http + /v1/chat/completions")
+        T.equal(RemoteLLM.chatURL("http://x/v1/chat/completions")?.absoluteString,
+                "http://x/v1/chat/completions", "full path left as-is")
+        T.equal(ClaudeLLM.defaultModel, "claude-opus-4-8", "Claude default is Opus 4.8")
     }
 
     T.group("SummaryService.bodyText reads text files") {

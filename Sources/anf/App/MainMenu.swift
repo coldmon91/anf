@@ -74,12 +74,15 @@ final class ToolsMenuController: NSObject, NSMenuItemValidation {
 
     @objc func toggleAI(_ sender: Any?) { AIFeatures.enabled.toggle() }
 
+    @objc func aiProviderSettings(_ sender: Any?) { Keymap.openSettingsFile() }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        // The on/off toggle is always available and shows a checkmark.
+        // The on/off toggle and the settings link are always available.
         if item.action == #selector(toggleAI(_:)) {
             item.state = AIFeatures.enabled ? .on : .off
             return true
         }
+        if item.action == #selector(aiProviderSettings(_:)) { return true }
         guard model != nil else { return false }
         // The on-device-LLM actions need the feature on; the plain file-moving
         // tools (organize by kind, tidy screenshots) don't.
@@ -181,6 +184,10 @@ enum MainMenu {
                                          action: #selector(ToolsMenuController.toggleAI(_:)),
                                          keyEquivalent: "")
         aiToggle.target = ToolsMenuController.shared
+        let aiProvider = toolsMenu.addItem(withTitle: L("AI Provider… (Apple / Local / Claude)", "AI 모델 연결… (Apple / 로컬 / Claude)"),
+                                           action: #selector(ToolsMenuController.aiProviderSettings(_:)),
+                                           keyEquivalent: "")
+        aiProvider.target = ToolsMenuController.shared
         toolsMenu.addItem(.separator())
         let byKind = toolsMenu.addItem(withTitle: L("Organize by Kind", "종류별 정리"),
                                        action: #selector(ToolsMenuController.organizeByKind(_:)),

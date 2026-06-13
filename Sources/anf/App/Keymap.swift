@@ -109,14 +109,26 @@ final class Keymap {
         if let ai = Self.aiFeatures(fileAt: Self.fileURL) {
             AIFeatures.enabled = ai
         }
+        // AI provider config (apple / local / claude). Mirror file → UserDefaults
+        // so RemoteLLM / ClaudeLLM / LocalLLM all read one source.
+        let dict = Self.settingsDict(fileAt: Self.fileURL)
+        for key in ["aiProvider", "aiEndpoint", "aiModel", "aiApiKey"] {
+            if let s = dict[key] as? String {
+                UserDefaults.standard.set(s, forKey: "anf.\(key)")
+            }
+        }
+    }
+
+    nonisolated static func settingsDict(fileAt url: URL) -> [String: Any] {
+        guard let data = try? Data(contentsOf: url),
+              let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        else { return [:] }
+        return dict
     }
 
     /// "aiFeatures": true/false in the settings file, or nil when absent.
     nonisolated static func aiFeatures(fileAt url: URL) -> Bool? {
-        guard let data = try? Data(contentsOf: url),
-              let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-        else { return nil }
-        return dict["aiFeatures"] as? Bool
+        settingsDict(fileAt: url)["aiFeatures"] as? Bool
     }
 
     static let previewTextSizeChanged = Notification.Name("anf.settings.previewTextSize")
@@ -258,6 +270,10 @@ final class Keymap {
         let size = stored >= 9 && stored <= 28 ? Int(stored) : 16
         appendKey("previewTextSize", "\(size)")
         appendKey("aiFeatures", AIFeatures.enabled ? "true" : "false")
+        appendKey("aiProvider", "\"apple\"")
+        appendKey("aiEndpoint", "\"\"")
+        appendKey("aiModel", "\"\"")
+        appendKey("aiApiKey", "\"\"")
         try? out.write(to: url, atomically: true, encoding: .utf8)
     }
 
@@ -286,10 +302,18 @@ final class Keymap {
             "An action may have several chords (JSON array). Rebinding an action frees its old keys;",
             "binding a key another action used steals it. Menu items keep showing the factory shortcut.",
             "previewTextSize — inspector text previews (markdown/json/code/document), 9-28. ⌘+/⌘− also adjusts it live.",
-            "aiFeatures — on-device AI (summarize, ask, suggest name, auto-tag, organize-by-content, image search). true/false. Also toggleable in the Tools menu."
+            "aiFeatures — on-device AI (summarize, ask, suggest name, auto-tag, organize-by-content, image search). true/false. Also toggleable in the Tools menu.",
+            "aiProvider — which model backend: 'apple' (on-device, default), 'local' (Ollama/LM Studio via aiEndpoint), or 'claude' (Anthropic API — sends content to the cloud).",
+            "aiEndpoint — local OpenAI-compatible URL, e.g. 'http://localhost:11434/v1' (Ollama) or 'http://localhost:1234/v1' (LM Studio).",
+            "aiModel — model name for local/claude, e.g. 'llama3.2' or 'claude-opus-4-8'.",
+            "aiApiKey — API key for 'claude' (sk-ant-…); usually empty for local."
           ],
           "previewTextSize": 16,
           "aiFeatures": false,
+          "aiProvider": "apple",
+          "aiEndpoint": "",
+          "aiModel": "",
+          "aiApiKey": "",
         """)
         for (i, entry) in defaults.enumerated() {
             let (action, specs) = entry
