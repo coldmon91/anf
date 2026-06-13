@@ -72,6 +72,26 @@ func runLLMTests() {
                  "CJK budget is tighter than Latin")
     }
 
+    T.group("AskService builds context and explains gaps") {
+        // A readable file → its body is the context, no reason.
+        let md = dir.appendingPathComponent("ask.md")
+        try? "The deadline is March 3rd.".write(to: md, atomically: true, encoding: .utf8)
+        let fileCtx = AskService.context(for: md, isFolder: false)
+        T.expect(fileCtx.text.contains("March 3rd"), "file context is the body")
+        T.expect(fileCtx.reason == nil, "readable file has no reason")
+
+        // A folder with a doc → excerpt; an empty folder → a reason.
+        let sub = dir.appendingPathComponent("askfolder-\(UUID().uuidString)")
+        try? fm.createDirectory(at: sub, withIntermediateDirectories: true)
+        let folderEmpty = AskService.context(for: sub, isFolder: true)
+        T.expect(folderEmpty.text.isEmpty && folderEmpty.reason != nil,
+                 "empty folder → reason, no context")
+        try? "Quarterly numbers up 12%.".write(to: sub.appendingPathComponent("q.txt"),
+                                               atomically: true, encoding: .utf8)
+        let folderCtx = AskService.context(for: sub, isFolder: true)
+        T.expect(folderCtx.text.contains("Quarterly"), "folder context gathers doc text")
+    }
+
     T.group("hasSummarizableText classification") {
         func item(_ name: String) -> FileItem? {
             let u = dir.appendingPathComponent(name)

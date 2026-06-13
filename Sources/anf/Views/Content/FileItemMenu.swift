@@ -43,6 +43,7 @@ enum FileItemMenu {
             if item.hasSummarizableText {
                 menu.addItem(.separator())
                 add(L("Summarize (AI)", "AI 요약")) { FolderAITools.summarizeFile(item.url, name: item.name) }
+                add(L("Ask… (AI)", "질문하기… (AI)")) { FolderAITools.ask(url: item.url, name: item.name, isFolder: false) }
                 add(L("Suggest Name (AI)", "AI 이름 제안")) { FolderAITools.suggestNames([item.url], title: item.name, model: model) }
             } else if OCRService.isImage(item.url) {
                 menu.addItem(.separator())
@@ -51,6 +52,9 @@ enum FileItemMenu {
                 menu.addItem(.separator())
                 add(L("Summarize Folder (AI)", "이 폴더 요약 (AI)")) {
                     FolderAITools.summarizeFolder(item.url, name: item.name)
+                }
+                add(L("Ask This Folder… (AI)", "이 폴더에 질문하기… (AI)")) {
+                    FolderAITools.ask(url: item.url, name: item.name, isFolder: true)
                 }
             }
         }
@@ -124,6 +128,9 @@ enum FileItemMenu {
         let folder = model.currentURL
         add(L("Summarize Folder (AI)", "이 폴더 요약 (AI)")) {
             FolderAITools.summarizeFolder(folder, name: folder.lastPathComponent)
+        }
+        add(L("Ask This Folder… (AI)", "이 폴더에 질문하기… (AI)")) {
+            FolderAITools.ask(url: folder, name: folder.lastPathComponent, isFolder: true)
         }
         add(L("Tidy Screenshots", "스크린샷 정리")) { FolderAITools.tidyScreenshots(folder: folder, model: model) }
         add(L("Organize by Kind", "종류별 정리")) { FolderAITools.organizeByKind(folder: folder, model: model) }

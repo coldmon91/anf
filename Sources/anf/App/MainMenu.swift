@@ -62,6 +62,11 @@ final class ToolsMenuController: NSObject, NSMenuItemValidation {
         FolderAITools.summarizeFolder(m.currentURL, name: m.currentURL.lastPathComponent)
     }
 
+    @objc func askFolder(_ sender: Any?) {
+        guard let m = model else { return }
+        FolderAITools.ask(url: m.currentURL, name: m.currentURL.lastPathComponent, isFolder: true)
+    }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool { model != nil }
 }
 
@@ -167,6 +172,10 @@ enum MainMenu {
                                           action: #selector(ToolsMenuController.summarizeFolder(_:)),
                                           keyEquivalent: "")
         sumFolder.target = ToolsMenuController.shared
+        let askFolder = toolsMenu.addItem(withTitle: L("Ask This Folder… (AI)", "이 폴더에 질문하기… (AI)"),
+                                          action: #selector(ToolsMenuController.askFolder(_:)),
+                                          keyEquivalent: "")
+        askFolder.target = ToolsMenuController.shared
 
         // Window menu
         let windowItem = NSMenuItem()
