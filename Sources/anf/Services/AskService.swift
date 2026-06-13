@@ -58,8 +58,8 @@ enum AskService {
         let clipped = context.count > budget ? String(context.prefix(budget)) : context
 
         let instructions = answerInKorean
-            ? "주어진 문서 내용만을 근거로 질문에 한국어로 정확하고 간결하게 답하세요. 문서에 없는 내용이면 '문서에 없습니다'라고 답하세요. 반드시 한국어로만 답하세요."
-            : "Answer the question using ONLY the document content below. Be accurate and concise. If the answer isn't in the document, say it isn't there."
+            ? "아래 내용을 바탕으로 질문에 한국어로 정확하고 간결하게 답하세요. 내용을 종합·요약해 설명해도 됩니다(‘이게 뭐야’ 같은 개요 질문 포함). 다만 내용에서 합리적으로 알 수 없는 사실은 지어내지 말고 ‘내용에 없습니다’라고 하세요. 반드시 한국어로만 답하세요."
+            : "Answer the question using the content below. You may summarize and synthesize it (including overview questions like ‘what is this?’). Don't invent facts that aren't reasonably supported — say so if it's genuinely not there. Be concise."
         let prompt = "문서:\n\(clipped)\n\n질문: \(q)"
         let reply = await LocalLLM.reply(instructions: instructions, prompt: prompt, maxTokens: 500)
         let text = reply.text ?? LocalLLM.failureMessage()
