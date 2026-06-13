@@ -129,12 +129,11 @@ enum PaletteSearch {
     /// OCR is heavy, so the scan count is capped tighter than the doc sweep and
     /// the first cold pass is what pays; later queries hit the cache.
     static func imageContent(root: URL, needle: String, cap: Int) -> [URL] {
-        guard let fd = ExternalTools.path("fd") else { return [] }
-        var args = ["--color=never", "--absolute-path", "--type", "f"]
-        for ext in OCRService.imageExtensions { args += ["--extension", ext] }
-        let scanLimit = 60   // OCR cost is real; bound the cold sweep
-        args += ["--max-results", "\(scanLimit)", ".", root.path]
-        let files = ExternalTools.run(fd, args, maxLines: scanLimit, timeout: 2.0)
+        // No fd dependency: gather images with anf's own getattrlistbulk walk
+        // (faster than fd, works for everyone). OCR (250ms–1.3s/image) dwarfs
+        // the walk anyway, so the scanLimit — not enumeration — is the real bound.
+        let scanLimit = 60
+        let files = imageFiles(under: root, limit: scanLimit)
         guard !files.isEmpty else { return [] }
 
         let lock = NSLock()
@@ -142,12 +141,35 @@ enum PaletteSearch {
         DispatchQueue.concurrentPerform(iterations: files.count) { i in
             lock.lock(); let enough = matched.count >= cap; lock.unlock()
             if enough { return }
-            let url = URL(fileURLWithPath: files[i])
+            let url = files[i]
             guard let text = OCRTextCache.shared.text(for: url) else { return }
             if text.localizedCaseInsensitiveContains(needle) {
                 lock.lock(); if matched.count < cap { matched.append(url) }; lock.unlock()
             }
         }
         return matched
+    }
+
+    /// Breadth-first getattrlistbulk walk collecting up to `limit` image files
+    /// under `root`. Depth-bounded and count-bounded so a huge tree can't make
+    /// the cold OCR sweep wander; BFS so near files (the likely targets) win.
+    static func imageFiles(under root: URL, limit: Int, maxDepth: Int = 6) -> [URL] {
+        var out: [URL] = []
+        var queue: [(path: String, depth: Int)] = [(root.path, 0)]
+        var head = 0
+        while head < queue.count, out.count < limit {
+            let (dir, depth) = queue[head]; head += 1
+            guard let entries = FastDirRead.list(path: dir) else { continue }
+            for e in entries where !e.isHidden {
+                let full = dir + "/" + e.name
+                if e.isDir {
+                    if depth < maxDepth { queue.append((full, depth + 1)) }
+                } else if OCRService.imageExtensions.contains((e.name as NSString).pathExtension.lowercased()) {
+                    out.append(URL(fileURLWithPath: full))
+                    if out.count >= limit { break }
+                }
+            }
+        }
+        return out
     }
 }

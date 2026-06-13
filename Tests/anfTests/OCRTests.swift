@@ -58,14 +58,26 @@ func runOCRTests() {
         T.expect(OCRTextCache.shared.text(for: blank) == nil, "text-free image → nil")
     }
 
-    T.group("imageContent search finds text inside an image") {
+    T.group("imageContent search finds text inside an image (no fd needed)") {
         let u = dir.appendingPathComponent("receipt.png")
         makeImage("Starbucks Receipt", to: u)
+        // Uses the getattrlistbulk walk, so this works with or without fd.
         let hits = PaletteSearch.imageContent(root: dir, needle: "starbucks", cap: 10)
-        // fd may be absent in CI; only assert when the scan actually ran.
-        if ExternalTools.path("fd") != nil {
-            T.expect(hits.contains { $0.lastPathComponent == "receipt.png" },
-                     "OCR'd image matched by its text content")
-        }
+        T.expect(hits.contains { $0.lastPathComponent == "receipt.png" },
+                 "OCR'd image matched by its text content")
+    }
+
+    T.group("imageFiles walk: bounded, recursive, skips non-images") {
+        let sub = dir.appendingPathComponent("nested/deep")
+        try? fm.createDirectory(at: sub, withIntermediateDirectories: true)
+        makeImage("A", to: dir.appendingPathComponent("a.png"))
+        makeImage("B", to: sub.appendingPathComponent("b.png"))
+        try? "x".write(to: dir.appendingPathComponent("note.txt"), atomically: true, encoding: .utf8)
+        let found = PaletteSearch.imageFiles(under: dir, limit: 50)
+        let names = Set(found.map(\.lastPathComponent))
+        T.expect(names.contains("a.png"), "top-level image found")
+        T.expect(names.contains("b.png"), "nested image found (recursive)")
+        T.expect(!names.contains("note.txt"), "non-image skipped")
+        T.expect(PaletteSearch.imageFiles(under: dir, limit: 1).count == 1, "limit honored")
     }
 }
