@@ -25,6 +25,13 @@ struct SidebarSection: Identifiable {
 }
 
 enum SidebarBuilder {
+    /// iCloud Drive's on-disk root under a home directory. The per-app ubiquity
+    /// container API needs an entitlement and points elsewhere, so this fixed
+    /// path is the correct one for the user's iCloud Drive.
+    static func iCloudDriveURL(home: URL) -> URL {
+        home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs")
+    }
+
     static func favorites() -> [SidebarItem] {
         let fm = FileManager.default
         func dir(_ d: FileManager.SearchPathDirectory) -> URL? {
@@ -35,6 +42,13 @@ enum SidebarBuilder {
         items.append(SidebarItem(name: L("Home", "홈"), symbol: "house", url: home))
         if let u = dir(.desktopDirectory)   { items.append(.init(name: L("Desktop", "데스크탑"), symbol: "menubar.dock.rectangle", url: u)) }
         if let u = dir(.documentDirectory)  { items.append(.init(name: L("Documents", "문서"), symbol: "doc", url: u)) }
+        // iCloud Drive lives at a fixed path (the per-app ubiquity container API
+        // needs an entitlement and returns the WRONG dir); show it only when the
+        // user actually has iCloud Drive set up. Reported missing 2026-06-14.
+        let iCloud = iCloudDriveURL(home: home)
+        if fm.fileExists(atPath: iCloud.path) {
+            items.append(.init(name: L("iCloud Drive", "iCloud Drive"), symbol: "icloud", url: iCloud))
+        }
         if let u = dir(.downloadsDirectory) { items.append(.init(name: L("Downloads", "다운로드"), symbol: "arrow.down.circle", url: u)) }
         if let u = dir(.moviesDirectory)    { items.append(.init(name: L("Movies", "동영상"), symbol: "film", url: u)) }
         if let u = dir(.musicDirectory)     { items.append(.init(name: L("Music", "음악"), symbol: "music.note", url: u)) }

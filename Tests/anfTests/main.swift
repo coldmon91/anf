@@ -47,6 +47,7 @@ MainActor.assumeIsolated { runInspectorTests() }
 runKeymapTests()
 runDocxStructureTests()
 runHwpxStructureTests()
+runSidebarTests()
 
 print("")
 if T.failures.isEmpty {

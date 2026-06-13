@@ -240,6 +240,7 @@ final class IconItem: NSCollectionViewItem, NSTextFieldDelegate {
     private let icon = NSImageView()
     private let label = NSTextField(wrappingLabelWithString: "")
     private let labelBackdrop = NSView()
+    private let tagDot = NSView()   // Finder colour tag, top-trailing of the icon
     private var iconW: NSLayoutConstraint?
     private var iconH: NSLayoutConstraint?
     private var currentID: FileItem.ID?
@@ -268,15 +269,27 @@ final class IconItem: NSCollectionViewItem, NSTextFieldDelegate {
         label.drawsBackground = false
         label.delegate = self
 
+        tagDot.translatesAutoresizingMaskIntoConstraints = false
+        tagDot.wantsLayer = true
+        tagDot.layer?.cornerRadius = 5
+        tagDot.layer?.borderWidth = 1.5
+        tagDot.layer?.borderColor = NSColor.windowBackgroundColor.cgColor
+        tagDot.isHidden = true
+
         view.addSubview(icon)
         view.addSubview(labelBackdrop)
         view.addSubview(label)
+        view.addSubview(tagDot)
         iconW = icon.widthAnchor.constraint(equalToConstant: 84)
         iconH = icon.heightAnchor.constraint(equalToConstant: 84)
         NSLayoutConstraint.activate([
             iconW!, iconH!,
             icon.topAnchor.constraint(equalTo: view.topAnchor, constant: 4),
             icon.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            tagDot.widthAnchor.constraint(equalToConstant: 10),
+            tagDot.heightAnchor.constraint(equalToConstant: 10),
+            tagDot.trailingAnchor.constraint(equalTo: icon.trailingAnchor, constant: -1),
+            tagDot.topAnchor.constraint(equalTo: icon.topAnchor, constant: 1),
             label.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: 5),
             label.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 2),
             label.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -2),
@@ -304,6 +317,12 @@ final class IconItem: NSCollectionViewItem, NSTextFieldDelegate {
                       let self, self.currentID == id else { return }
                 self.icon.image = thumb
             }
+        }
+        if let tag = FileTags.primaryColor(of: item.url) {
+            tagDot.layer?.backgroundColor = tag.cgColor
+            tagDot.isHidden = false
+        } else {
+            tagDot.isHidden = true
         }
         applySelectionStyle()
     }
