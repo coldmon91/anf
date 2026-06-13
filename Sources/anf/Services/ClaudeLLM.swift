@@ -47,8 +47,19 @@ enum ClaudeLLM {
     /// Configured = an API key is set.
     static var isConfigured: Bool { apiKey != nil }
 
+    /// Why the last call failed (HTTP status + Anthropic error message), for UI.
+    nonisolated(unsafe) static var lastError: String?
+
     static func generate(instructions: String, prompt: String, maxTokens: Int, temperature: Double = 0.3) async -> String? {
-        guard let key = apiKey, let url = URL(string: "https://api.anthropic.com/v1/messages") else { return nil }
+        lastError = nil
+        guard let key = apiKey, let url = URL(string: "https://api.anthropic.com/v1/messages") else {
+            lastError = L("No Anthropic API key set.", "Anthropic API 키가 없어요."); return nil
+        }
+        if key.hasPrefix("sk-ant-oat") {
+            lastError = L("That looks like an OAuth token, not an API key. Use a key from console.anthropic.com (sk-ant-api03-…).",
+                          "OAuth 토큰 같아요. API 키가 아닙니다 — console.anthropic.com의 키(sk-ant-api03-…)를 쓰세요.")
+            return nil
+        }
         let body: [String: Any] = [
             "model": model,
             "max_tokens": maxTokens,
@@ -66,16 +77,25 @@ enum ClaudeLLM {
         req.httpBody = data
         req.timeoutInterval = 120
 
-        guard let (respData, resp) = try? await URLSession.shared.data(for: req),
-              let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode),
-              let json = (try? JSONSerialization.jsonObject(with: respData)) as? [String: Any],
-              let content = json["content"] as? [[String: Any]]
-        else { return nil }
+        guard let (respData, resp) = try? await URLSession.shared.data(for: req) else {
+            lastError = L("Couldn’t reach api.anthropic.com (network/offline?).",
+                          "api.anthropic.com에 연결하지 못했어요 (네트워크/오프라인?).")
+            return nil
+        }
+        let json = (try? JSONSerialization.jsonObject(with: respData)) as? [String: Any]
+        if let http = resp as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            // Surface Anthropic's error: {"error":{"type":…,"message":…}}
+            let msg = ((json?["error"] as? [String: Any])?["message"] as? String) ?? ""
+            lastError = "HTTP \(http.statusCode)\(msg.isEmpty ? "" : " · \(msg)")"
+            return nil
+        }
+        guard let content = json?["content"] as? [[String: Any]] else { lastError = "Unexpected response"; return nil }
         // Concatenate all text blocks.
         let text = content.compactMap { ($0["type"] as? String) == "text" ? $0["text"] as? String : nil }
             .joined()
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? nil : text
+        if text.isEmpty { lastError = "Empty response"; return nil }
+        return text
     }
 
     static func reachable() async -> Bool {

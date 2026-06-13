@@ -84,6 +84,23 @@ enum LocalLLM {
         }
     }
 
+    /// A provider-aware reason the last generate() returned nothing — so the UI
+    /// can say "Claude: HTTP 401 · invalid x-api-key" instead of blaming the
+    /// on-device model.
+    static func failureMessage() -> String {
+        switch provider {
+        case .claude:
+            return ClaudeLLM.lastError.map { "Claude — \($0)" }
+                ?? L("Claude didn’t respond — try again.", "Claude가 응답하지 않았어요 — 다시 시도하세요.")
+        case .local:
+            return L("The local model didn’t respond — is the server running, and the model loaded?",
+                     "로컬 모델이 응답하지 않았어요 — 서버가 켜져 있고 모델이 로드됐나요?")
+        case .apple:
+            return L("The on-device model didn’t respond — try again shortly.",
+                     "온디바이스 모델이 응답하지 않았어요 — 잠시 후 다시 시도하세요.")
+        }
+    }
+
     private static func endpointHost() -> String? {
         guard let e = RemoteLLM.endpoint, let u = URL(string: e.contains("://") ? e : "http://" + e) else { return nil }
         if let h = u.host { return u.port.map { "\(h):\($0)" } ?? h }

@@ -62,8 +62,7 @@ enum AskService {
             : "Answer the question using ONLY the document content below. Be accurate and concise. If the answer isn't in the document, say it isn't there."
         let prompt = "문서:\n\(clipped)\n\n질문: \(q)"
         let reply = await LocalLLM.reply(instructions: instructions, prompt: prompt, maxTokens: 500)
-        let text = reply.text ?? L("The on-device model couldn’t answer that — try rephrasing.",
-                                   "온디바이스 모델이 답하지 못했어요 — 질문을 바꿔보세요.")
+        let text = reply.text ?? LocalLLM.failureMessage()
         return (text, reply.reasoning)
     }
 

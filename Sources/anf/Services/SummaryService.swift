@@ -82,10 +82,7 @@ enum SummaryService {
         guard let text else {
             return await Task.detached(priority: .userInitiated) { emptyReason(for: url) }.value
         }
-        guard let summary = await LocalLLM.summarize(text) else {
-            return L("The on-device model didn’t respond — try again shortly.",
-                     "온디바이스 모델이 응답하지 않았어요 — 잠시 후 다시 시도하세요.")
-        }
+        guard let summary = await LocalLLM.summarize(text) else { return LocalLLM.failureMessage() }
         return summary
     }
 
@@ -189,7 +186,6 @@ enum SummaryService {
     /// generate(), or a "try again" hint when the model returns nothing.
     private static func generateOrRetryHint(_ instructions: String, _ prompt: String, _ maxTokens: Int) async -> String {
         await LocalLLM.generate(instructions: instructions, prompt: prompt, maxTokens: maxTokens)
-            ?? L("The on-device model didn’t respond — try again shortly.",
-                 "온디바이스 모델이 응답하지 않았어요 — 잠시 후 다시 시도하세요.")
+            ?? LocalLLM.failureMessage()
     }
 }
