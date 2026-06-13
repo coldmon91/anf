@@ -38,6 +38,10 @@ enum RemoteLLM {
     /// POST a chat completion. Returns the assistant text, or nil on any error.
     static func generate(instructions: String, prompt: String, maxTokens: Int, temperature: Double = 0.3) async -> String? {
         guard let base = endpoint, let url = chatURL(base) else { return nil }
+        // Reasoning models (LM Studio splits thinking into `reasoning_content`)
+        // spend the completion budget THINKING — too small a cap and the real
+        // answer is truncated to "". Local inference is free, so give headroom.
+        let cap = max(maxTokens, 2048)
         let body: [String: Any] = [
             "model": model,
             "messages": [
@@ -45,7 +49,7 @@ enum RemoteLLM {
                 ["role": "user", "content": prompt],
             ],
             "temperature": temperature,
-            "max_tokens": maxTokens,
+            "max_tokens": cap,
             "stream": false,
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: body) else { return nil }
@@ -61,10 +65,27 @@ enum RemoteLLM {
               let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode),
               let json = (try? JSONSerialization.jsonObject(with: respData)) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]], let first = choices.first,
-              let message = first["message"] as? [String: Any],
-              let content = message["content"] as? String
+              let message = first["message"] as? [String: Any]
         else { return nil }
-        return content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let raw = (message["content"] as? String) ?? ""
+        let cleaned = stripThink(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? nil : cleaned
+    }
+
+    /// Some models inline chain-of-thought as <think>…</think> in `content`;
+    /// strip it so only the answer remains.
+    static func stripThink(_ s: String) -> String {
+        guard s.contains("<think>") else { return s }
+        var out = s
+        while let open = out.range(of: "<think>") {
+            if let close = out.range(of: "</think>", range: open.upperBound..<out.endIndex) {
+                out.removeSubrange(open.lowerBound..<close.upperBound)
+            } else {
+                out.removeSubrange(open.lowerBound..<out.endIndex)   // unterminated
+                break
+            }
+        }
+        return out
     }
 
     /// Quick reachability probe (used by the status line / config check).

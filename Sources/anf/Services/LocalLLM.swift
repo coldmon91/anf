@@ -69,6 +69,26 @@ enum LocalLLM {
         }
     }
 
+    /// Human-readable "what's serving this", for progress UI so the user always
+    /// sees which backend is working (never a blank panel).
+    static var providerLabel: String {
+        switch provider {
+        case .claude:
+            return "Claude · \(ClaudeLLM.model)"
+        case .local:
+            let host = endpointHost() ?? "local"
+            return "\(RemoteLLM.model) · \(host)"
+        case .apple:
+            return L("Apple on-device", "Apple 온디바이스")
+        }
+    }
+
+    private static func endpointHost() -> String? {
+        guard let e = RemoteLLM.endpoint, let u = URL(string: e.contains("://") ? e : "http://" + e) else { return nil }
+        if let h = u.host { return u.port.map { "\(h):\($0)" } ?? h }
+        return nil
+    }
+
     /// Localized one-liner explaining an unavailable state.
     static func unavailableHint(_ s: Status) -> String {
         switch s {

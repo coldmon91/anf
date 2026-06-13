@@ -52,7 +52,10 @@ final class SummaryPanel: NSObject {
             guard let self else { return }
             let result = await run()
             state.loading = false
-            state.text = result
+            state.text = result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? L("No response from the model. If it's a local reasoning model, raise its output length, or try another model.",
+                    "모델이 응답하지 않았어요. 로컬 추론(reasoning) 모델이면 출력 길이를 늘리거나 다른 모델을 시도하세요.")
+                : result
         }
     }
 }
