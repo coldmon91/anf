@@ -89,66 +89,107 @@ enum SummaryService {
         return summary
     }
 
-    /// Summarize a FOLDER. Reads its documents; if their text can't be extracted
-    /// (e.g. a folder of image-only PDFs), falls back to describing the folder
-    /// from the FILE NAMES so the user still gets something useful — and says so.
+    /// Images to actually open (OCR + classify) when describing an image folder.
+    static let imageSampleCap = 15
+
+    /// What a folder sweep collected, off the main thread.
+    private struct FolderScan {
+        var bodies = ""        // extracted document text
+        var imageDigest = ""   // labels + OCR from sampled images
+        var names: [String] = []
+        var imageCount = 0
+    }
+
+    /// Summarize a FOLDER. Reads its documents; if there's no document text,
+    /// analyzes its IMAGES (classifier labels + OCR); if neither, infers from the
+    /// FILE NAMES — always returning something useful and saying which it used.
     static func summarizeFolder(url: URL) async -> String {
         guard LocalLLM.isAvailable else { return LocalLLM.unavailableHint(LocalLLM.status) }
 
-        let gathered = await Task.detached(priority: .userInitiated) { () -> (bodies: String, names: [String], skipped: Int)? in
+        let scan = await Task.detached(priority: .userInitiated) { () -> FolderScan? in
             guard let entries = FastDirRead.list(path: url.path) else { return nil }
-            let docs = entries
-                .filter { !$0.isDir && !$0.isHidden && textExts.contains(($0.name as NSString).pathExtension.lowercased()) }
-                .prefix(40)
-            guard !docs.isEmpty else { return nil }
+            let files = entries.filter { !$0.isDir && !$0.isHidden }
+            guard !files.isEmpty else { return nil }
+            var s = FolderScan()
+            s.names = files.map(\.name)
 
-            let names = docs.map(\.name)
+            // 1) Documents.
+            let docs = files.filter { textExts.contains(($0.name as NSString).pathExtension.lowercased()) }
             let perDoc = max(400, LocalLLM.inputCharBudget / max(min(docs.count, 20), 1))
             var parts: [String] = []
-            var total = 0, skipped = 0
-            for e in docs {
-                if e.size > folderDocSizeCap { skipped += 1; continue }   // skip huge files
-                let fileURL = url.appendingPathComponent(e.name)
-                guard let body = bodyText(for: fileURL) else { skipped += 1; continue }
+            var total = 0
+            for e in docs.prefix(40) {
+                if e.size > folderDocSizeCap { continue }
+                guard let body = bodyText(for: url.appendingPathComponent(e.name)) else { continue }
                 parts.append("## \(e.name)\n\(String(body.prefix(perDoc)))")
                 total += min(body.count, perDoc)
                 if total >= LocalLLM.inputCharBudget || parts.count >= 20 { break }
             }
-            return (parts.joined(separator: "\n\n"), names, skipped)
+            s.bodies = parts.joined(separator: "\n\n")
+
+            // 2) Images — only worth the OCR/classify cost if there's no doc text.
+            let images = files.filter { OCRService.isImage(url.appendingPathComponent($0.name)) }
+            s.imageCount = images.count
+            if s.bodies.isEmpty && !images.isEmpty {
+                var lines: [String] = []
+                for e in images.prefix(imageSampleCap) {
+                    let img = url.appendingPathComponent(e.name)
+                    var bits: [String] = []
+                    let labels = ImageClassifier.labels(for: img)
+                    if !labels.isEmpty { bits.append(labels.prefix(5).joined(separator: ", ")) }
+                    if let ocr = OCRService.recognizeText(in: img, fast: true)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines), !ocr.isEmpty {
+                        bits.append("“\(String(ocr.prefix(150)))”")
+                    }
+                    if !bits.isEmpty { lines.append("- \(e.name): " + bits.joined(separator: " / ")) }
+                }
+                s.imageDigest = lines.joined(separator: "\n")
+            }
+            return s
         }.value
 
-        guard let gathered else {
-            return L("This folder has no documents to summarize.",
-                     "이 폴더에는 요약할 문서가 없어요.")
+        guard let scan else {
+            return L("This folder is empty.", "이 폴더는 비어 있어요.")
         }
 
-        // Got real text → summarize it.
-        if !gathered.bodies.isEmpty {
-            let korean = LocalLLM.isKorean(gathered.bodies)
+        // 1) Document text.
+        if !scan.bodies.isEmpty {
+            let korean = LocalLLM.isKorean(scan.bodies)
             let instructions = korean
                 ? "여러 문서의 발췌를 읽고, 이 폴더가 전반적으로 어떤 내용인지 한국어로 3~5문장 개요로 정리하세요. 주요 주제와 문서 종류를 묶어서. 반드시 한국어로만 답하세요."
                 : "Given excerpts from several documents, write a 3–5 sentence overview of what this folder contains — group the main themes and document types."
-            let prompt = "폴더: \(url.lastPathComponent)\n\n\(gathered.bodies)"
-            return await LocalLLM.generate(instructions: instructions, prompt: prompt, maxTokens: 500)
-                ?? L("The on-device model didn’t respond — try again shortly.",
-                     "온디바이스 모델이 응답하지 않았어요 — 잠시 후 다시 시도하세요.")
+            return await generateOrRetryHint(instructions, "폴더: \(url.lastPathComponent)\n\n\(scan.bodies)", 500)
         }
 
-        // No extractable text → describe from file names, and be honest about it.
-        let nameList = gathered.names.prefix(60).joined(separator: "\n")
+        // 2) Image analysis.
+        if !scan.imageDigest.isEmpty {
+            let korean = LocalLLM.isKorean(scan.imageDigest) || L10n.isKorean
+            let instructions = korean
+                ? "다음은 폴더 속 이미지들의 분류 라벨과 인식된 텍스트입니다. 이 이미지들이 전반적으로 무엇에 관한 것인지 한국어 3~5문장으로 정리하세요. 반드시 한국어로만 답하세요."
+                : "Below are classifier labels and OCR text from images in a folder. Summarize in 3–5 sentences what these images are about."
+            let result = await generateOrRetryHint(instructions, "폴더: \(url.lastPathComponent)\n\(scan.imageDigest)", 400)
+            let note = korean
+                ? "\n\n(이미지 \(min(scan.imageCount, imageSampleCap))/\(scan.imageCount)개를 OCR·분류로 분석한 결과예요.)"
+                : "\n\n(Analyzed \(min(scan.imageCount, imageSampleCap)) of \(scan.imageCount) images via OCR + classification.)"
+            return result + note
+        }
+
+        // 3) File names only.
+        let nameList = scan.names.prefix(60).joined(separator: "\n")
         let korean = LocalLLM.isKorean(nameList) || L10n.isKorean
-        let note = korean
-            ? "\n\n(참고: 문서 본문에서 텍스트를 추출하지 못해 파일 이름만으로 추정한 결과예요. 대부분 이미지로 된 PDF로 보입니다.)"
-            : "\n\n(Note: text couldn't be extracted from the documents, so this is inferred from file names only — they look like image-only PDFs.)"
         let instructions = korean
             ? "다음은 한 폴더 안의 파일 이름 목록입니다. 이 폴더가 무엇에 관한 것인지 이름만으로 한국어 2~3문장으로 추정해 설명하세요. 반드시 한국어로만 답하세요."
             : "Below are the file names in one folder. From the names alone, infer in 2–3 sentences what this folder is about."
-        let prompt = "폴더: \(url.lastPathComponent)\n\(nameList)"
-        let inferred = await LocalLLM.generate(instructions: instructions, prompt: prompt, maxTokens: 300)
-        guard let inferred else {
-            return L("Couldn’t extract text from these documents (they look like image-only PDFs).",
-                     "이 문서들에서 텍스트를 추출하지 못했어요 (이미지로 된 PDF로 보입니다).")
-        }
-        return inferred + note
+        let note = korean
+            ? "\n\n(참고: 본문을 추출하지 못해 파일 이름만으로 추정한 결과예요.)"
+            : "\n\n(Note: inferred from file names only — contents couldn't be extracted.)"
+        return await generateOrRetryHint(instructions, "폴더: \(url.lastPathComponent)\n\(nameList)", 300) + note
+    }
+
+    /// generate(), or a "try again" hint when the model returns nothing.
+    private static func generateOrRetryHint(_ instructions: String, _ prompt: String, _ maxTokens: Int) async -> String {
+        await LocalLLM.generate(instructions: instructions, prompt: prompt, maxTokens: maxTokens)
+            ?? L("The on-device model didn’t respond — try again shortly.",
+                 "온디바이스 모델이 응답하지 않았어요 — 잠시 후 다시 시도하세요.")
     }
 }
