@@ -24,8 +24,15 @@ final class FavoritesStore {
     /// machine. Each path is imported ONCE (tracked in `importedKey`), so a
     /// favorite you later remove in-app won't keep coming back; adding new paths
     /// to the JSON imports just those on next launch.
+    /// JSON paths array for the current pins, to paste into the settings file.
+    func exportPaths() -> [String] { items.map(\.path) }
+
     private func importFromSettings() {
-        guard let list = Keymap.settingsDict(fileAt: Keymap.fileURL)["favorites"] as? [String] else { return }
+        let dict = Keymap.settingsDict(fileAt: Keymap.fileURL)
+        // Accept either key; "pinned" matches the sidebar section, "favorites" is
+        // the original name.
+        let list = ((dict["pinned"] as? [String]) ?? []) + ((dict["favorites"] as? [String]) ?? [])
+        guard !list.isEmpty else { return }
         let fm = FileManager.default
         var imported = Set(UserDefaults.standard.stringArray(forKey: importedKey) ?? [])
         var changed = false, importedChanged = false

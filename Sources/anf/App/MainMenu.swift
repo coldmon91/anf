@@ -41,6 +41,25 @@ final class ViewMenuController: NSObject, NSMenuItemValidation {
 final class ToolsMenuController: NSObject, NSMenuItemValidation {
     static let shared = ToolsMenuController()
     private var model: BrowserModel? { WindowRegistry.current?.active }
+    private var ws: WorkspaceModel? { WindowRegistry.current }
+
+    /// Copy the current pinned folders + saved workspaces as JSON, ready to paste
+    /// into the ⌘, settings file — for migrating to another Mac.
+    @objc func exportPinsWorkspaces(_ sender: Any?) {
+        guard let ws else { return }
+        let pinned = ws.favorites.exportPaths().map { "    \"\($0)\"" }.joined(separator: ",\n")
+        let workspaces = ws.savedViews.exportJSON()
+        let json = "\"pinned\": [\n\(pinned)\n],\n\"workspaces\": \(workspaces)"
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(json, forType: .string)
+        let a = NSAlert()
+        a.messageText = L("Copied pins & workspaces", "핀·워크스페이스를 복사했어요")
+        a.informativeText = L("Paste the JSON into the settings file (⌘,) to move them to another Mac.",
+                              "설정 파일(⌘,)에 붙여넣으면 다른 Mac으로 옮길 수 있어요.")
+        a.addButton(withTitle: L("Open Settings", "설정 열기"))
+        a.addButton(withTitle: L("Done", "완료"))
+        if a.runModal() == .alertFirstButtonReturn { Keymap.openSettingsFile() }
+    }
 
     @objc func tidyScreenshots(_ sender: Any?) {
         guard let m = model else { return }
@@ -214,6 +233,11 @@ enum MainMenu {
                                           action: #selector(ToolsMenuController.askFolder(_:)),
                                           keyEquivalent: "")
         askFolder.target = ToolsMenuController.shared
+        toolsMenu.addItem(.separator())
+        let exportPins = toolsMenu.addItem(withTitle: L("Copy Pins & Workspaces (JSON)…", "핀·워크스페이스 복사 (JSON)…"),
+                                           action: #selector(ToolsMenuController.exportPinsWorkspaces(_:)),
+                                           keyEquivalent: "")
+        exportPins.target = ToolsMenuController.shared
 
         // Window menu
         let windowItem = NSMenuItem()

@@ -278,6 +278,7 @@ final class Keymap {
         appendKey("aiModel", "\"\"")
         appendKey("openWith", "\"\"")
         appendKey("favorites", "[]")
+        appendKey("workspaces", "[]")
         try? out.write(to: url, atomically: true, encoding: .utf8)
     }
 
@@ -312,7 +313,8 @@ final class Keymap {
             "aiEndpoint — local OpenAI-compatible URL for 'local', e.g. 'http://localhost:11434/v1' (Ollama) or 'http://localhost:1234/v1' (LM Studio).",
             "aiModel — override the model, e.g. 'claude-opus-4-8' or 'llama3.2'. Empty uses the provider default.",
             "openWith — app for F4 'Open With' (name, path, or bundle id), e.g. 'Typora'.",
-            "favorites — paths to pin in the sidebar, e.g. ['~/Code', '~/Documents/Work']. Each is imported once (great for migrating to a new Mac)."
+            "favorites / pinned — paths to pin in the sidebar, e.g. ['~/Code', '~/Documents/Work']. Each imported once (great for migrating to a new Mac).",
+            "workspaces — saved window arrangements (use Tools → Copy Pins & Workspaces to generate this)."
           ],
           "previewTextSize": 16,
           "aiFeatures": false,
@@ -322,6 +324,7 @@ final class Keymap {
           "aiModel": "",
           "openWith": "",
           "favorites": [],
+          "workspaces": [],
         """)
         for (i, entry) in defaults.enumerated() {
             let (action, specs) = entry

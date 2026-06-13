@@ -32,6 +32,8 @@ final class SavedViewsStore {
     private static let key = "anf.savedViews.v1"
     private(set) var views: [SavedView]
 
+    private static let importedKey = "anf.savedViews.importedIds"
+
     init() {
         if let data = UserDefaults.standard.data(forKey: Self.key),
            let decoded = try? JSONDecoder().decode([SavedView].self, from: data) {
@@ -39,6 +41,32 @@ final class SavedViewsStore {
         } else {
             views = []
         }
+        importFromSettings()
+    }
+
+    /// Import `"workspaces": [ {SavedView JSON} ]` from the ⌘, settings file —
+    /// for migrating saved window arrangements to a new Mac. Each id is imported
+    /// once (tracked), so removing one in-app won't resurrect it.
+    private func importFromSettings() {
+        guard let raw = Keymap.settingsDict(fileAt: Keymap.fileURL)["workspaces"],
+              let data = try? JSONSerialization.data(withJSONObject: raw),
+              let decoded = try? JSONDecoder().decode([SavedView].self, from: data) else { return }
+        var imported = Set(UserDefaults.standard.stringArray(forKey: Self.importedKey) ?? [])
+        var changed = false, importedChanged = false
+        for v in decoded {
+            let key = v.id.uuidString
+            guard !imported.contains(key) else { continue }
+            imported.insert(key); importedChanged = true
+            if !views.contains(where: { $0.id == v.id }) { views.append(v); changed = true }
+        }
+        if importedChanged { UserDefaults.standard.set(Array(imported), forKey: Self.importedKey) }
+        if changed { persist() }
+    }
+
+    /// JSON for the current views, to paste into the settings file's "workspaces".
+    func exportJSON() -> String {
+        let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return (try? enc.encode(views)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
     }
 
     func add(_ view: SavedView) { views.append(view); persist() }
