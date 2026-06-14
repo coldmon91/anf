@@ -446,14 +446,24 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
     }
 
     private func eject(_ url: URL, name: String) {
-        do {
-            try NSWorkspace.shared.unmountAndEjectDevice(at: url)
-            locations = SidebarBuilder.locations()
-            rebuildTree()
-        } catch {
-            FileOperations.presentFailures(
-                L("Could not eject ‘\(name)’", "‘\(name)’을(를) 추출하지 못했습니다"),
-                [error.localizedDescription])
+        // unmountAndEjectDevice is synchronous and can block for many seconds on a
+        // slow/network volume (SMB) — run it off the main thread so the UI never
+        // beachballs, then update the sidebar / report failure back on main.
+        Task { [weak self] in
+            let result: Result<Void, Error> = await Task.detached(priority: .userInitiated) {
+                do { try NSWorkspace.shared.unmountAndEjectDevice(at: url); return .success(()) }
+                catch { return .failure(error) }
+            }.value
+            guard let self else { return }
+            switch result {
+            case .success:
+                self.locations = SidebarBuilder.locations()
+                self.rebuildTree()
+            case .failure(let error):
+                FileOperations.presentFailures(
+                    L("Could not eject ‘\(name)’", "‘\(name)’을(를) 추출하지 못했습니다"),
+                    [error.localizedDescription])
+            }
         }
     }
 }
