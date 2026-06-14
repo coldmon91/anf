@@ -180,6 +180,9 @@ final class WorkspaceModel {
     let favorites = FavoritesStore()
     let customSSH = CustomSSHStore()
     let savedViews = SavedViewsStore()
+    /// App-wide saved searches (singleton); exposed here so the sidebar can observe
+    /// and list them alongside the per-window stores.
+    var smartFolders: SmartFoldersStore { .shared }
 
     // Split proportions for the pane grid: fraction of width given to the left
     // column (dual/quad) and of height given to the top row (rows/quad).

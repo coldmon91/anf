@@ -306,6 +306,19 @@ final class BrowserModel: Identifiable {
     /// Small listings sort inline to avoid a one-frame flicker.
     private func recomputeItems() {
         itemsToken += 1
+        // Virtual listings (Recents, smart folders) keep their supplied order —
+        // recency for Recents — so they bypass the sort/cache/tree pipeline.
+        if isVirtual {
+            let filter = filterText
+            let filtered = filter.isEmpty ? allItems
+                : allItems.filter { $0.name.localizedCaseInsensitiveContains(filter) }
+            rowDepth = [:]
+            sortedTop = filtered
+            items = filtered
+            itemsVersion &+= 1
+            selectedItemsCache = nil
+            return
+        }
         let snapshot = allItems
         let filter = filterText
         let order = sort
@@ -362,12 +375,41 @@ final class BrowserModel: Identifiable {
 
     var canGoBack: Bool { !back.isEmpty }
     var canGoForward: Bool { !forward.isEmpty }
-    var canGoUp: Bool { isRemote ? remotePath != "/" : currentURL.path != "/" }
+    var canGoUp: Bool {
+        if isVirtual { return false }
+        return isRemote ? remotePath != "/" : currentURL.path != "/"
+    }
 
     // MARK: - Remote (SFTP)
 
     /// True when the current location is a remote `sftp://host/path` address.
     var isRemote: Bool { currentURL.scheme == "sftp" }
+
+    // MARK: - Virtual locations (Recents, Smart Folders)
+
+    /// True when the current location is a synthetic `anf://…` listing (Recents,
+    /// a smart folder) rather than a real directory.
+    var isVirtual: Bool { currentURL.scheme == "anf" }
+
+    /// The "Recents" virtual location — a recency-ordered list of recently opened
+    /// files, populated from `RecentFiles`.
+    static let recentsURL = URL(string: "anf://recents")!
+
+    /// Human-readable label for any location, used by the tab strip and path bar.
+    /// Virtual `anf://` URLs get a friendly name; real folders use the leaf name.
+    static func displayName(for url: URL) -> String {
+        if url.scheme == "anf" {
+            switch url.host {
+            case "recents": return L("Recents", "최근")
+            case "smartfolder":
+                let id = UUID(uuidString: url.lastPathComponent)
+                return id.flatMap { SmartFoldersStore.shared.folder(id: $0)?.name }
+                    ?? L("Smart Folder", "스마트 폴더")
+            default:        return url.host ?? "anf"
+            }
+        }
+        return url.path == "/" ? "Macintosh HD" : url.lastPathComponent
+    }
     var remoteHost: String? { currentURL.host }
     var remotePath: String { let p = currentURL.path; return p.isEmpty ? "/" : p }
     /// Set while a remote listing fails, so the view can show the reason.
@@ -395,6 +437,7 @@ final class BrowserModel: Identifiable {
     /// Foundation's path components — walking *up* with deletingLastPathComponent
     /// can fail to reach a fixed point for some URLs and spin forever.
     var pathComponents: [URL] {
+        if isVirtual { return [currentURL] }
         if isRemote, let host = remoteHost {
             var urls = [Self.remoteURL(host: host, path: "/")]
             var path = ""
@@ -425,7 +468,7 @@ final class BrowserModel: Identifiable {
     /// it back. Stale-mount-safe: the blocking `resourceValues` runs detached, so
     /// it can hang harmlessly without freezing the UI. Called from `reload()`.
     private func refreshFreeSpace() {
-        guard !isRemote else { freeSpaceLabel = ""; return }
+        guard currentURL.isFileURL else { freeSpaceLabel = ""; return }
         let url = currentURL
         Task.detached(priority: .utility) {
             let bytes = (try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
@@ -450,7 +493,7 @@ final class BrowserModel: Identifiable {
         }
         currentURL = url
         expanded.removeAll(); childCache.removeAll(); rowDepth.removeAll()  // fresh folder = collapsed
-        if url.scheme != "sftp" {          // local-only bookkeeping
+        if url.isFileURL {                 // local-only bookkeeping
             RecentFolders.shared.record(url)
             FileIndex.shared.build(for: url)   // pre-index for instant ⌘K filename search
             VisualIndex.shared.build(for: url) // background image classification (resumable)
@@ -480,6 +523,7 @@ final class BrowserModel: Identifiable {
         if item.isBrowsableContainer {
             navigate(to: item.url)
         } else {
+            RecentFiles.shared.record(item.url)   // backs the Recents location
             FileOperations.open(item)
         }
     }
@@ -605,6 +649,7 @@ final class BrowserModel: Identifiable {
         childCache.removeAll()       // refetch expanded folders' children on reload
         selection.removeAll()
         refreshFreeSpace()
+        if isVirtual { reloadVirtual(token: token); return }
         if isRemote { reloadRemote(token: token); return }
         // Paint the last known listing instantly (no read, no sort) — the fresh
         // bulk read below lands ~100ms later and diff-replaces any change.
@@ -694,6 +739,40 @@ final class BrowserModel: Identifiable {
 
     private func joinRemote(_ base: String, _ name: String) -> String {
         base == "/" ? "/" + name : base + "/" + name
+    }
+
+    /// Populate a virtual `anf://…` listing. Recents resolves the recency-ordered
+    /// file list (dropping any that no longer exist) into FileItems; the order is
+    /// preserved (recomputeItems skips sorting for virtual locations).
+    private func reloadVirtual(token: Int) {
+        let host = currentURL.host
+        Task { @MainActor in
+            let built: [FileItem]
+            switch host {
+            case "recents":
+                let urls = RecentFiles.shared.items
+                built = await Task.detached(priority: .userInitiated) {
+                    let fm = FileManager.default
+                    return urls.compactMap { fm.fileExists(atPath: $0.path) ? FileItem(url: $0) : nil }
+                }.value
+            case "smartfolder":
+                let folder = UUID(uuidString: currentURL.lastPathComponent)
+                    .flatMap { SmartFoldersStore.shared.folder(id: $0) }
+                if let folder {
+                    built = await Task.detached(priority: .userInitiated) {
+                        SmartFolderQuery.evaluate(folder).compactMap { FileItem(url: $0) }
+                    }.value
+                } else {
+                    built = []
+                }
+            default:
+                built = []
+            }
+            guard token == loadToken else { return }
+            allItems = built
+            recomputeItems()
+            isLoading = false
+        }
     }
 
 

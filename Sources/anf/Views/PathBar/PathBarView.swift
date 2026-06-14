@@ -41,7 +41,7 @@ struct PathBarView: View {
     }
 
     private func label(_ url: URL) -> String {
-        url.path == "/" ? "Macintosh HD" : url.lastPathComponent
+        BrowserModel.displayName(for: url)
     }
 
     private var status: String {

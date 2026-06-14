@@ -42,7 +42,7 @@ struct TabStripView: View {
     }
 
     private func title(_ tab: BrowserModel) -> String {
-        let name = tab.currentURL.lastPathComponent
+        let name = BrowserModel.displayName(for: tab.currentURL)
         return name.isEmpty ? "/" : name
     }
 }

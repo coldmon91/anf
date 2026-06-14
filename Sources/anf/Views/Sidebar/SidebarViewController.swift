@@ -12,14 +12,15 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
     // MARK: Node model
 
     enum Section: String, CaseIterable {
-        case favorites, pinned, workspace, locations, ssh
+        case favorites, pinned, workspace, smartFolders, locations, ssh
         var title: String {
             switch self {
-            case .favorites: L("Favorites", "즐겨찾기")
-            case .pinned:    L("Pinned", "핀")
-            case .workspace: "Workspace"
-            case .locations: L("Locations", "위치")
-            case .ssh:       "SSH"
+            case .favorites:    L("Favorites", "즐겨찾기")
+            case .pinned:       L("Pinned", "핀")
+            case .workspace:    "Workspace"
+            case .smartFolders: L("Smart Folders", "스마트 폴더")
+            case .locations:    L("Locations", "위치")
+            case .ssh:          "SSH"
             }
         }
         var defaultsKey: String { "anf.sidebar.open.\(rawValue)" }
@@ -30,6 +31,7 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
             case header(Section)
             case folder(name: String, symbol: String, url: URL, removable: Bool, ejectable: Bool)
             case workspaceRow(SavedView)
+            case smartFolderRow(SmartFolder)
             case sshRow(SSHHost, CustomSSHHost?)
         }
         let kind: Kind
@@ -148,6 +150,7 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
         withObservationTracking {
             _ = workspace.favorites.items
             _ = workspace.savedViews.views
+            _ = workspace.smartFolders.folders
             _ = workspace.customSSH.hosts
             _ = workspace.terminals.map(\.isRunning)
         } onChange: { [weak self] in
@@ -199,6 +202,9 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
                 && url.standardizedFileURL.path == model.currentURL.standardizedFileURL.path
         case .workspaceRow(let view):
             return workspace.activeViewID == view.id
+        case .smartFolderRow(let folder):
+            return workspace.activeViewID == nil
+                && model.currentURL.absoluteString == folder.url.absoluteString
         case .sshRow(let host, _):
             return workspace.showTerminal && workspace.terminal?.sshHost == host.alias
         case .header:
@@ -216,10 +222,17 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
             let h = Node(.header(s)); h.children = children; return h
         }
 
-        roots.append(header(.favorites, SidebarBuilder.favorites().map {
+        // "Recents" (recently opened files) leads the Favorites section, mirroring
+        // Finder. It's a virtual anf:// location, not a real folder.
+        var favChildren: [Node] = [
+            Node(.folder(name: L("Recents", "최근"), symbol: "clock",
+                         url: BrowserModel.recentsURL, removable: false, ejectable: false))
+        ]
+        favChildren += SidebarBuilder.favorites().map {
             Node(.folder(name: $0.name, symbol: $0.symbol, url: $0.url,
                          removable: false, ejectable: false))
-        })!)
+        }
+        roots.append(header(.favorites, favChildren)!)
         if let pinned = header(.pinned, workspace.favorites.items.map {
             Node(.folder(name: $0.lastPathComponent.isEmpty ? $0.path : $0.lastPathComponent,
                          symbol: "star.fill", url: $0, removable: true, ejectable: false))
@@ -227,6 +240,11 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
         if let ws = header(.workspace, workspace.savedViews.views.map {
             Node(.workspaceRow($0))
         }) { roots.append(ws) }
+        // Smart Folders always shows its header (even when empty) so the "+" to
+        // create the first saved search is reachable.
+        let smartHeader = Node(.header(.smartFolders))
+        smartHeader.children = workspace.smartFolders.folders.map { Node(.smartFolderRow($0)) }
+        roots.append(smartHeader)
         if let locs = header(.locations, locations.map {
             Node(.folder(name: $0.name, symbol: $0.symbol, url: $0.url,
                          removable: false, ejectable: $0.ejectable))
@@ -287,8 +305,10 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
         case .header(let s):
             let cell = SidebarHeaderCell.make(o)
             cell.configure(title: s.title,
-                           showsAdd: s == .ssh,
-                           onAdd: { [weak self] in self?.addSSHHost() })
+                           showsAdd: s == .ssh || s == .smartFolders,
+                           onAdd: { [weak self] in
+                               if s == .smartFolders { self?.addSmartFolder() } else { self?.addSSHHost() }
+                           })
             return cell
 
         case .folder(let name, let symbol, let url, _, _):
@@ -307,6 +327,14 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
             let symbol = PaneLayout(rawValue: view.snapshot.layout)?.symbol ?? "macwindow"
             cell.configure(text: view.name, symbol: symbol, tint: .controlAccentColor,
                            highlighted: workspace.activeViewID == view.id, dot: nil)
+            return cell
+
+        case .smartFolderRow(let folder):
+            let cell = SidebarRowCell.make(o)
+            let highlighted = workspace.activeViewID == nil
+                && model.currentURL.absoluteString == folder.url.absoluteString
+            cell.configure(text: folder.name, symbol: "folder.badge.gearshape",
+                           tint: .controlAccentColor, highlighted: highlighted, dot: nil)
             return cell
 
         case .sshRow(let host, _):
@@ -338,7 +366,9 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
         case .header:
             break   // disclosure handles it
         case .folder(_, _, let url, _, _):
-            if NSEvent.modifierFlags.contains(.option) {
+            if url.scheme == "anf" {
+                model.navigate(to: url)        // virtual location (Recents) — no pin machinery
+            } else if NSEvent.modifierFlags.contains(.option) {
                 model.navigate(to: url)        // navigate just this pane
             } else {
                 // In a split this navigates only the focused pane; from a single
@@ -347,6 +377,8 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
             }
         case .workspaceRow(let view):
             workspace.applyView(view)
+        case .smartFolderRow(let folder):
+            model.navigate(to: folder.url)
         case .sshRow(let host, let custom):
             if let custom { workspace.openSSH(custom) } else { workspace.openSSH(host.alias) }
         }
@@ -412,6 +444,11 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
                 self?.workspace.savedViews.remove(id: view.id)
             }
 
+        case .smartFolderRow(let folder):
+            add(L("Edit…", "편집…")) { [weak self] in self?.editSmartFolder(folder) }
+            menu.addItem(.separator())
+            add(L("Delete", "삭제")) { SmartFoldersStore.shared.remove(id: folder.id) }
+
         case .sshRow(let host, let custom):
             let target = custom?.target ?? host.alias
             add(L("Open over SFTP", "SFTP로 열기")) { [weak self] in self?.workspace.openRemote(target) }
@@ -443,6 +480,26 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource,
     private func addSSHHost() {
         guard let custom = SSHPrompt.run() else { return }
         workspace.customSSH.add(custom)
+    }
+
+    /// Create a saved search scoped to the focused folder (or home if the pane is
+    /// on a virtual/remote location), then jump into it.
+    private func addSmartFolder() {
+        let here = model.currentURL
+        let scope = here.isFileURL ? here : FileManager.default.homeDirectoryForCurrentUser
+        guard let r = SmartFolderPrompt.run(scopeName: BrowserModel.displayName(for: scope)) else { return }
+        let folder = SmartFolder(name: r.name, scopePath: scope.path, rule: r.rule)
+        SmartFoldersStore.shared.add(folder)
+        model.navigate(to: folder.url)
+    }
+
+    private func editSmartFolder(_ folder: SmartFolder) {
+        guard let r = SmartFolderPrompt.run(
+            scopeName: BrowserModel.displayName(for: URL(fileURLWithPath: folder.scopePath)),
+            existing: (folder.name, folder.rule)) else { return }
+        SmartFoldersStore.shared.rename(id: folder.id, to: r.name)
+        SmartFoldersStore.shared.update(id: folder.id, rule: r.rule)
+        if model.currentURL.absoluteString == folder.url.absoluteString { model.reload() }
     }
 
     private func eject(_ url: URL, name: String) {
