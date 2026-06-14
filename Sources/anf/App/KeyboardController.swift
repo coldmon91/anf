@@ -129,9 +129,15 @@ final class KeyboardController: NSObject, QLPreviewPanelDataSource, QLPreviewPan
                 if model.viewMode == .icons || model.viewMode == .gallery {
                     moveSel(by: -1, extend: shift); return true
                 }
-                // List: ← collapses the selected folder (or jumps to its parent row).
+                // List: ← collapses the selected folder; on a nested row it jumps
+                // up to the parent folder and collapses it (ForkLift/Finder).
                 if model.viewMode == .list, let it = model.selectedItems.first {
                     if model.isExpandable(it) && model.isExpanded(it) { model.toggleExpand(it); return true }
+                    if let parent = model.parentRow(of: it) {
+                        model.selection = [parent.id]
+                        if model.isExpanded(parent) { model.toggleExpand(parent) }
+                        return true
+                    }
                 }
                 return false
             case 124:

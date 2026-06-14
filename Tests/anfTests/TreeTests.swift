@@ -37,6 +37,7 @@ func runTreeTests() {
             T.equal(model.depth(of: subItem), 0, "folder stays at depth 0")
             if let s1 = model.items.first(where: { $0.name == "s1.txt" }) {
                 T.equal(model.depth(of: s1), 1, "child is depth 1")
+                T.equal(model.parentRow(of: s1)?.name, "sub", "parentRow of a child is its folder (← target)")
             }
             T.expect(model.isExpanded(subItem), "folder marked expanded")
         }

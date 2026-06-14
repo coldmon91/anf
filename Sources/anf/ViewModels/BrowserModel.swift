@@ -45,6 +45,16 @@ final class BrowserModel: Identifiable {
     func isExpanded(_ item: FileItem) -> Bool { expanded.contains(item.url) }
     func depth(of item: FileItem) -> Int { rowDepth[item.url] ?? 0 }
 
+    /// The expanded folder row that contains this nested row (one level up), or
+    /// nil at top level — used by ← to jump to and collapse the parent.
+    func parentRow(of item: FileItem) -> FileItem? {
+        let d = depth(of: item)
+        guard d > 0, let idx = items.firstIndex(where: { $0.id == item.id }) else { return nil }
+        var i = idx - 1
+        while i >= 0 { if depth(of: items[i]) == d - 1 { return items[i] }; i -= 1 }
+        return nil
+    }
+
     /// Expand/collapse a folder row inline (list mode).
     func toggleExpand(_ item: FileItem) {
         guard isExpandable(item) else { return }
