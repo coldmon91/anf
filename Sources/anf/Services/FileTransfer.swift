@@ -182,6 +182,14 @@ final class FileTransfer {
                         }
                     }
                 }
+                // If the destination folder was pre-created for expansion but every
+                // child copy failed, the empty stub directory would be orphaned with
+                // no undo record (result.done is empty, so nothing is recorded).
+                // Remove it so the user isn't left with a stray empty folder (FT-003).
+                if let root = expandedRoot, done.isEmpty {
+                    try? fm.removeItem(at: root)
+                    expandedRoot = nil
+                }
                 // Undo for an expanded folder targets the top-level destination,
                 // not 26k children.
                 let undoCreated = expandedRoot.map { [$0] } ?? done.map(\.1)
