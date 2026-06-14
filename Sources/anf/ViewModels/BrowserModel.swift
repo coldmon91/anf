@@ -131,10 +131,8 @@ final class BrowserModel: Identifiable {
     /// Rebuild `items` from the cached sorted top + expansions, without sorting.
     private func reflattenTree() {
         if sortedTop.isEmpty { recomputeItems(); return }
-        let treeOn = viewMode == .list && !expanded.isEmpty
-        items = treeOn ? flattenTree(sortedTop) : { rowDepth = [:]; return sortedTop }()
-        itemsVersion &+= 1
-        selectedItemsCache = nil
+        let treeOn = viewMode == .list && !expanded.isEmpty && groupKey == .none
+        publishItems(base: sortedTop, treeOn: treeOn)
         repairOrphanedSelection()
     }
 
@@ -224,6 +222,19 @@ final class BrowserModel: Identifiable {
         }
     }
     var sort = SortOrder() { didSet { recomputeItems() } }
+    /// How the listing is grouped ("Arrange by"). App-wide and persisted; `.none`
+    /// is a plain flat list. Grouping disables the expand tree.
+    var groupKey: GroupKey = GroupKey(rawValue: UserDefaults.standard.string(forKey: "anf.groupKey") ?? "") ?? .none {
+        didSet {
+            guard groupKey != oldValue else { return }
+            UserDefaults.standard.set(groupKey.rawValue, forKey: "anf.groupKey")
+            recomputeItems()
+        }
+    }
+    /// Header ranges for the current grouped `items` (empty when not grouped).
+    private(set) var groupRanges: [FileGroup] = []
+    /// True while an Arrange-by grouping is active (the views insert headers).
+    var grouped: Bool { !groupRanges.isEmpty }
     var showHidden = false { didSet { reload() } }
     /// Icon and text sizes are app-wide preferences: every tab — including ones
     /// created later by splits, Workspace restores or relaunch — starts at the
@@ -312,11 +323,8 @@ final class BrowserModel: Identifiable {
             let filter = filterText
             let filtered = filter.isEmpty ? allItems
                 : allItems.filter { $0.name.localizedCaseInsensitiveContains(filter) }
-            rowDepth = [:]
             sortedTop = filtered
-            items = filtered
-            itemsVersion &+= 1
-            selectedItemsCache = nil
+            publishItems(base: filtered, treeOn: false)
             return
         }
         let snapshot = allItems
@@ -333,15 +341,14 @@ final class BrowserModel: Identifiable {
         // Splice expanded folders' children in (list mode only) AFTER caching the
         // flat sorted list — the cache stays the plain listing; the tree is view
         // state.
-        let treeOn = viewMode == .list && !expanded.isEmpty
+        // Grouping (Arrange-by) and the disclosure tree are mutually exclusive.
+        let treeOn = viewMode == .list && !expanded.isEmpty && groupKey == .none
         childSortedCache.removeAll(keepingCapacity: true)   // sort/filter may have changed
         if snapshot.count < 2_000 {
             let sorted = fs.filteredSorted(snapshot, filter: filter, by: order)
             cache(sorted)
             sortedTop = sorted
-            items = treeOn ? flattenTree(sorted) : { rowDepth = [:]; return sorted }()
-            itemsVersion &+= 1
-            selectedItemsCache = nil
+            publishItems(base: sorted, treeOn: treeOn)
             return
         }
         let token = itemsToken
@@ -351,11 +358,27 @@ final class BrowserModel: Identifiable {
                 guard let self, self.itemsToken == token else { return }
                 cache(computed)
                 self.sortedTop = computed
-                self.items = treeOn ? self.flattenTree(computed) : { self.rowDepth = [:]; return computed }()
-                self.itemsVersion &+= 1
-                self.selectedItemsCache = nil
+                self.publishItems(base: computed, treeOn: treeOn)
             }
         }
+    }
+
+    /// Publish `base` as the visible `items`, applying grouping (Arrange-by) or the
+    /// expand tree. Grouping reorders into buckets and fills `groupRanges`; with no
+    /// grouping the flat (optionally tree-flattened) list is used and `groupRanges`
+    /// clears. Keyboard navigation always sees the resulting flat `items`.
+    private func publishItems(base: [FileItem], treeOn: Bool) {
+        if groupKey != .none {
+            let g = FileGrouping.group(base, by: groupKey)
+            groupRanges = g.groups
+            rowDepth = [:]
+            items = g.items
+        } else {
+            groupRanges = []
+            items = treeOn ? flattenTree(base) : { rowDepth = [:]; return base }()
+        }
+        itemsVersion &+= 1
+        selectedItemsCache = nil
     }
 
     var selectedItems: [FileItem] {
@@ -653,7 +676,9 @@ final class BrowserModel: Identifiable {
         if isRemote { reloadRemote(token: token); return }
         // Paint the last known listing instantly (no read, no sort) — the fresh
         // bulk read below lands ~100ms later and diff-replaces any change.
-        if filterText.isEmpty,
+        // The cache holds the flat sorted listing; only fast-paint it when not
+        // grouped, otherwise an ungrouped flash precedes the regroup.
+        if filterText.isEmpty, groupKey == .none,
            let hit = ListingCache.shared.get(url: url, hidden: hidden, sort: sort) {
             allItems = hit.all
             items = hit.sorted

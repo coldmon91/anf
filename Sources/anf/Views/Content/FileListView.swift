@@ -19,6 +19,7 @@ struct FileListView: NSViewRepresentable {
         table.usesAlternatingRowBackgroundColors = false
         table.style = .inset
         table.rowSizeStyle = .custom
+        table.floatsGroupRows = false   // Arrange-by headers scroll with their group
         table.intercellSpacing = NSSize(width: 8, height: 2)
         table.dataSource = coord
         table.delegate = coord
@@ -78,6 +79,56 @@ struct FileListView: NSViewRepresentable {
 
         var items: [FileItem] { model.items }
 
+        // MARK: Row model (grouping)
+        //
+        // When Arrange-by is active the table interleaves group-header rows with
+        // file rows. `items` stays the flat file list (keyboard nav is unchanged);
+        // these maps translate between table rows and item indices.
+        enum RowKind { case header(String); case item(Int) }
+        private var rowKinds: [RowKind] = []
+        private var rowForItem: [Int] = []   // itemIndex → table row
+
+        /// Rebuild the table's row model from `model.items` + `model.groupRanges`.
+        private func rebuildRows() {
+            let groups = model.groupRanges
+            let count = items.count
+            if groups.isEmpty {
+                rowKinds = (0..<count).map { .item($0) }
+                rowForItem = Array(0..<count)        // identity when flat
+                return
+            }
+            var rows: [RowKind] = []; rows.reserveCapacity(count + groups.count)
+            var map = [Int](repeating: 0, count: count)
+            for g in groups {
+                rows.append(.header(g.title))
+                for i in g.range where i < count {
+                    map[i] = rows.count
+                    rows.append(.item(i))
+                }
+            }
+            rowKinds = rows
+            rowForItem = map
+        }
+
+        /// The file at a table row, or nil for a group header.
+        private func item(atRow row: Int) -> FileItem? {
+            guard row >= 0, row < rowKinds.count, case .item(let i) = rowKinds[row], i < items.count
+            else { return nil }
+            return items[i]
+        }
+
+        private func isHeaderRow(_ row: Int) -> Bool {
+            guard row >= 0, row < rowKinds.count else { return false }
+            if case .header = rowKinds[row] { return true }
+            return false
+        }
+
+        /// Table row for a model item index (accounts for preceding headers).
+        private func row(forItemIndex i: Int) -> Int? {
+            guard i >= 0, i < rowForItem.count else { return nil }
+            return rowForItem[i]
+        }
+
         func applyRowHeight() {
             table?.rowHeight = max(20, 18 * model.textScale + 6)
         }
@@ -95,7 +146,18 @@ struct FileListView: NSViewRepresentable {
                 syncState.invalidateItems()   // force a reload so fonts repaint
                 lastIDs = []
             }
-            if syncState.itemsChanged(version: model.itemsVersion) {
+            rebuildRows()
+            if model.grouped {
+                // Grouped: the table has header rows, so the item-id Myers diff
+                // doesn't map to table rows — reload wholesale on any change.
+                if syncState.itemsChanged(version: model.itemsVersion) {
+                    syncState.applying { table.reloadData() }
+                    applyModelSelection(scroll: false, force: true)
+                } else {
+                    applyModelSelection(scroll: true)
+                }
+                lastIDs = []   // force a clean reload if grouping turns back off
+            } else if syncState.itemsChanged(version: model.itemsVersion) {
                 applyListDiff(to: table)
                 // Items changed → row indices may have shifted; re-map even if the
                 // selection set itself is identical.
@@ -165,7 +227,10 @@ struct FileListView: NSViewRepresentable {
         private func applyModelSelection(scroll: Bool, force: Bool = false) {
             guard let table else { return }
             guard syncState.selectionChanged(model.selection, force: force) else { return }
-            let want = IndexSet(model.selection.compactMap { model.index(of: $0) })
+            // Map item indices to table rows (headers shift them when grouped).
+            let want = IndexSet(model.selection
+                .compactMap { model.index(of: $0) }
+                .compactMap { row(forItemIndex: $0) })
             if want != table.selectedRowIndexes {
                 syncState.applying {
                     table.selectRowIndexes(want, byExtendingSelection: false)
@@ -173,7 +238,8 @@ struct FileListView: NSViewRepresentable {
                 // Follow the moving cursor (the growing edge of a shift-select),
                 // not the topmost row — otherwise shift+↓ / shift+PgDn never
                 // scroll because the top stays put. Fall back to the topmost.
-                if scroll, let target = model.selectionCursorIndex ?? want.first {
+                let cursorRow = model.selectionCursorIndex.flatMap { row(forItemIndex: $0) }
+                if scroll, let target = cursorRow ?? want.first {
                     table.scrollRowToVisible(target)
                 }
             }
@@ -184,7 +250,8 @@ struct FileListView: NSViewRepresentable {
             guard model.editingItemID != lastEditingID else { return }
             lastEditingID = model.editingItemID
             guard let id = model.editingItemID,
-                  let row = items.firstIndex(where: { $0.id == id }) else { return }
+                  let idx = items.firstIndex(where: { $0.id == id }),
+                  let row = row(forItemIndex: idx) else { return }
             table.scrollRowToVisible(row)
             DispatchQueue.main.async { [weak self, weak table] in
                 guard let self, let table else { return }
@@ -192,7 +259,8 @@ struct FileListView: NSViewRepresentable {
                 // and now, so the captured index could point at a different (or
                 // nonexistent) item — editColumn on a stale row edits the wrong
                 // file or crashes out of range.
-                guard let row = self.items.firstIndex(where: { $0.id == id }),
+                guard let idx = self.items.firstIndex(where: { $0.id == id }),
+                      let row = self.row(forItemIndex: idx),
                       row < table.numberOfRows else { return }
                 // The table must be first responder for editColumn to open the
                 // field editor — after a previous rename committed, focus may have
@@ -204,12 +272,31 @@ struct FileListView: NSViewRepresentable {
 
         // MARK: Data source
 
-        func numberOfRows(in tableView: NSTableView) -> Int { items.count }
+        func numberOfRows(in tableView: NSTableView) -> Int { rowKinds.count }
+
+        // MARK: Grouping rows
+
+        func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool { isHeaderRow(row) }
+
+        func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { !isHeaderRow(row) }
+
+        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+            isHeaderRow(row) ? max(22, 17 * model.textScale + 8) : max(20, 18 * model.textScale + 6)
+        }
 
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?,
                        row: Int) -> NSView? {
-            guard row < items.count, let col = tableColumn?.identifier.rawValue else { return nil }
-            let item = items[row]
+            // Group header: a single full-width label (group rows ignore columns,
+            // but NSTableView still asks the first column once).
+            if isHeaderRow(row), case .header(let title) = rowKinds[row] {
+                guard tableColumn == nil || tableColumn?.identifier.rawValue == "name" else { return nil }
+                let cell = (tableView.makeView(withIdentifier: .groupCell, owner: self) as? GroupHeaderCell)
+                    ?? GroupHeaderCell()
+                cell.identifier = .groupCell
+                cell.set(title, fontSize: 11 * model.textScale)
+                return cell
+            }
+            guard let item = item(atRow: row), let col = tableColumn?.identifier.rawValue else { return nil }
             let size = 13 * model.textScale
             let subSize = 12 * model.textScale
 
@@ -244,15 +331,15 @@ struct FileListView: NSViewRepresentable {
 
         func tableViewSelectionDidChange(_ notification: Notification) {
             guard !syncState.isSyncing, let table else { return }
-            let ids = table.selectedRowIndexes.compactMap { $0 < items.count ? items[$0].id : nil }
+            let ids = table.selectedRowIndexes.compactMap { item(atRow: $0)?.id }
             let newSel = Set(ids)
             syncState.recordApplied(newSel)
             if newSel != model.selection { model.selection = newSel }
         }
 
         @objc func doubleClicked() {
-            guard let table, table.clickedRow >= 0, table.clickedRow < items.count else { return }
-            model.open(items[table.clickedRow])
+            guard let table, let it = item(atRow: table.clickedRow) else { return }
+            model.open(it)
         }
 
         // MARK: Sorting
@@ -271,7 +358,8 @@ struct FileListView: NSViewRepresentable {
 
         func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
             let view = RoundedRowView()
-            view.stripe = row % 2 == 1
+            // No zebra stripes when grouped — the headers already segment the list.
+            view.stripe = !isHeaderRow(row) && !model.grouped && row % 2 == 1
             return view
         }
 
@@ -286,7 +374,7 @@ struct FileListView: NSViewRepresentable {
         // MARK: Drag & drop
 
         func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
-            row < items.count ? items[row].url as NSURL : nil
+            (item(atRow: row)?.url).map { $0 as NSURL }
         }
 
         // Without these two, registering for dragged types makes the table SWALLOW
@@ -298,7 +386,7 @@ struct FileListView: NSViewRepresentable {
                        proposedRow row: Int,
                        proposedDropOperation op: NSTableView.DropOperation) -> NSDragOperation {
             guard info.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: nil) else { return [] }
-            if !(op == .on && row >= 0 && row < items.count && items[row].isBrowsableContainer) {
+            if !(op == .on && item(atRow: row)?.isBrowsableContainer == true) {
                 tableView.setDropRow(-1, dropOperation: .above)   // whole-table drop
             }
             return copyRequested(info) ? .copy : .move
@@ -309,8 +397,8 @@ struct FileListView: NSViewRepresentable {
             guard let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self],
                                                                  options: nil) as? [URL],
                   !urls.isEmpty else { return false }
-            let into: URL = (op == .on && row >= 0 && row < items.count && items[row].isBrowsableContainer)
-                ? items[row].url : model.currentURL
+            let dropFolder = (op == .on && item(atRow: row)?.isBrowsableContainer == true) ? item(atRow: row) : nil
+            let into: URL = dropFolder?.url ?? model.currentURL
             // Never drop a folder into itself or its own subtree.
             guard !urls.contains(where: { into.path == $0.path || into.path.hasPrefix($0.path + "/") })
             else { return false }
@@ -345,8 +433,8 @@ struct FileListView: NSViewRepresentable {
         func menu(forRow row: Int) -> NSMenu? {
             // Empty space → the folder's background menu (New Folder, Vault, …),
             // matching the icon grid. A clicked row → that item's menu.
-            guard row >= 0, row < items.count else { return FileItemMenu.background(model: model) }
-            return FileItemMenu.build(for: items[row], model: model)
+            guard let it = item(atRow: row) else { return FileItemMenu.background(model: model) }
+            return FileItemMenu.build(for: it, model: model)
         }
     }
 }
@@ -422,6 +510,31 @@ final class FileTableView: NSTableView {
 private extension NSUserInterfaceItemIdentifier {
     static let nameCell = NSUserInterfaceItemIdentifier("anf.name")
     static let textCell = NSUserInterfaceItemIdentifier("anf.text")
+    static let groupCell = NSUserInterfaceItemIdentifier("anf.group")
+}
+
+/// Group header row (Arrange-by): a bottom-aligned, semibold secondary label
+/// spanning the row. Rendered for rows the table treats as group rows.
+final class GroupHeaderCell: NSTableCellView {
+    private let label = NSTextField(labelWithString: "")
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.isBordered = false; label.drawsBackground = false
+        label.lineBreakMode = .byTruncatingTail
+        label.textColor = .secondaryLabelColor
+        addSubview(label); textField = label
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8),
+            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    func set(_ text: String, fontSize: CGFloat) {
+        label.stringValue = text
+        label.font = .systemFont(ofSize: max(10, fontSize), weight: .semibold)
+    }
 }
 
 /// Name column cell: [disclosure ▸] icon + editable label, indented by tree depth.

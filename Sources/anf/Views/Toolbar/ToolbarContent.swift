@@ -108,6 +108,9 @@ struct ToolbarTrailingView: View {
                 ForEach(SortKey.allCases) { Text($0.title).tag($0) }
             }
             Toggle(L("Ascending", "오름차순"), isOn: Binding(get: { model.sort.ascending }, set: { model.sort.ascending = $0 }))
+            Picker(L("Arrange By", "그룹 기준"), selection: Binding(get: { model.groupKey }, set: { model.groupKey = $0 })) {
+                ForEach(GroupKey.allCases) { Text($0.title).tag($0) }
+            }
             Divider()
             Toggle(L("Show Hidden Files", "숨김 파일 보기"), isOn: Binding(get: { model.showHidden }, set: { model.showHidden = $0 }))
             Toggle(L("Show Status Bar", "상태 막대 보기"), isOn: Binding(get: { workspace.pathBarVisible },
