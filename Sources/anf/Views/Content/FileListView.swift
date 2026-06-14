@@ -354,7 +354,11 @@ final class RoundedRowView: NSTableRowView {
     override func drawSelection(in dirtyRect: NSRect) {
         guard selectionHighlightStyle != .none else { return }
         let rect = bounds.insetBy(dx: 6, dy: 1)
-        let color = isEmphasized
+        // Finder-style: accent blue whenever the window is key (so clicking a
+        // disclosure triangle or the sidebar doesn't drop it to gray); muted only
+        // when the whole window is inactive.
+        let key = window?.isKeyWindow ?? false
+        let color = key
             ? NSColor.selectedContentBackgroundColor
             : NSColor.unemphasizedSelectedContentBackgroundColor
         color.setFill()
@@ -406,6 +410,7 @@ private final class NameCell: NSTableCellView {
         disclosure.bezelStyle = .regularSquare
         disclosure.imagePosition = .imageOnly
         disclosure.contentTintColor = .secondaryLabelColor
+        disclosure.refusesFirstResponder = true   // don't steal focus → selection stays blue
         disclosure.target = self
         disclosure.action = #selector(toggle)
         disclosure.symbolConfiguration = .init(pointSize: 9, weight: .semibold)

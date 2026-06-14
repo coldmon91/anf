@@ -37,7 +37,11 @@ final class BrowserModel: Identifiable {
     @ObservationIgnored private var expanded: Set<URL> = []
     /// Lazily-loaded raw children per expanded folder (sorted per-level on use).
     @ObservationIgnored private var childCache: [URL: [FileItem]] = [:]
+    @ObservationIgnored private var childSortedCache: [URL: [FileItem]] = [:]
     @ObservationIgnored private var loadingChildren: Set<URL> = []
+    /// The sorted top level (without tree splicing) — cached so expand/collapse
+    /// re-flattens WITHOUT re-sorting the whole listing each time.
+    @ObservationIgnored private var sortedTop: [FileItem] = []
     /// Indent depth per row URL, rebuilt on every flatten (0 = top level).
     @ObservationIgnored private(set) var rowDepth: [URL: Int] = [:]
 
@@ -55,7 +59,8 @@ final class BrowserModel: Identifiable {
         return nil
     }
 
-    /// Expand/collapse a folder row inline (list mode).
+    /// Expand/collapse a folder row inline (list mode). Re-flattens from the
+    /// cached sorted top level — no full re-sort, so it stays snappy.
     func toggleExpand(_ item: FileItem) {
         guard isExpandable(item) else { return }
         if expanded.contains(item.url) {
@@ -64,7 +69,25 @@ final class BrowserModel: Identifiable {
             expanded.insert(item.url)
             if childCache[item.url] == nil { loadChildren(item.url) }
         }
-        recomputeItems()
+        reflattenTree()
+    }
+
+    /// Rebuild `items` from the cached sorted top + expansions, without sorting.
+    private func reflattenTree() {
+        if sortedTop.isEmpty { recomputeItems(); return }
+        let treeOn = viewMode == .list && !expanded.isEmpty
+        items = treeOn ? flattenTree(sortedTop) : { rowDepth = [:]; return sortedTop }()
+        itemsVersion &+= 1
+        selectedItemsCache = nil
+    }
+
+    /// Sorted children for a folder (cached; invalidated when sort/filter change).
+    private func childSorted(_ url: URL) -> [FileItem]? {
+        if let s = childSortedCache[url] { return s }
+        guard let raw = childCache[url] else { return nil }
+        let s = fs.filteredSorted(raw, filter: filterText, by: sort)
+        childSortedCache[url] = s
+        return s
     }
 
     func setExpanded(_ item: FileItem, _ on: Bool) {
@@ -80,8 +103,9 @@ final class BrowserModel: Identifiable {
             guard let self else { return }
             let kids = await fs.contentsFast(of: url, showHidden: hidden)
             self.childCache[url] = kids
+            self.childSortedCache[url] = nil
             self.loadingChildren.remove(url)
-            if self.expanded.contains(url) { self.recomputeItems() }
+            if self.expanded.contains(url) { self.reflattenTree() }
         }
     }
 
@@ -96,10 +120,10 @@ final class BrowserModel: Identifiable {
                 depth[it.url] = d
                 out.append(it)
                 guard it.isBrowsableContainer, expanded.contains(it.url) else { continue }
-                if let kids = childCache[it.url] {
-                    walk(fs.filteredSorted(kids, filter: filterText, by: sort), d + 1)
+                if let kids = childSorted(it.url) {
+                    walk(kids, d + 1)
                 } else {
-                    loadChildren(it.url)   // self-heals: recompute when loaded
+                    loadChildren(it.url)   // self-heals: re-flattens when loaded
                 }
             }
         }
@@ -219,9 +243,11 @@ final class BrowserModel: Identifiable {
         // flat sorted list — the cache stays the plain listing; the tree is view
         // state.
         let treeOn = viewMode == .list && !expanded.isEmpty
+        childSortedCache.removeAll(keepingCapacity: true)   // sort/filter may have changed
         if snapshot.count < 2_000 {
             let sorted = fs.filteredSorted(snapshot, filter: filter, by: order)
             cache(sorted)
+            sortedTop = sorted
             items = treeOn ? flattenTree(sorted) : { rowDepth = [:]; return sorted }()
             itemsVersion &+= 1
             selectedItemsCache = nil
@@ -233,6 +259,7 @@ final class BrowserModel: Identifiable {
             await MainActor.run { [weak self] in
                 guard let self, self.itemsToken == token else { return }
                 cache(computed)
+                self.sortedTop = computed
                 self.items = treeOn ? self.flattenTree(computed) : { self.rowDepth = [:]; return computed }()
                 self.itemsVersion &+= 1
                 self.selectedItemsCache = nil
