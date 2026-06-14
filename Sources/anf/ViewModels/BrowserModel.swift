@@ -871,14 +871,20 @@ final class BrowserModel: Identifiable {
         // In a Vault, snapshot the current state BEFORE deleting so the files are
         // recoverable from the timeline even after the Trash is emptied — that's the
         // whole Vault promise (V-002). Snapshot off-main (git), then trash.
-        guard VaultService.isVault(folder) else {
-            FileOperations.moveToTrash(targets)
-            reload()
-            broadcast(dirs: [folder.standardizedFileURL.path])
-            return
-        }
+        // isVault calls FileManager.fileExists twice — blocking on a stall-mounted
+        // network folder this can take ~30s on the main thread (BM-001). Run it
+        // off-main alongside the snapshot Task.
         let label = L("Before deleting \(targets.count) item(s)", "\(targets.count)개 삭제 전 자동 저장")
         Task { @MainActor in
+            let isVault = await Task.detached(priority: .userInitiated) {
+                VaultService.isVault(folder)
+            }.value
+            guard isVault else {
+                FileOperations.moveToTrash(targets)
+                self.reload()
+                self.broadcast(dirs: [folder.standardizedFileURL.path])
+                return
+            }
             let snapped = await Task.detached(priority: .userInitiated) {
                 VaultService.snapshot(at: folder, label: label)
             }.value
