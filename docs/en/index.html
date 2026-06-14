@@ -20,7 +20,7 @@
 <meta name="theme-color" content="#060607">
 <link rel="alternate" hreflang="ko" href="https://rescenedev.github.io/anf/">
 <link rel="alternate" hreflang="en" href="https://rescenedev.github.io/anf/en/">
-<link rel="stylesheet" href="../styles.css?v=20">
+<link rel="stylesheet" href="../styles.css?v=21">
 <!-- Cloudflare Web Analytics — cookieless site analytics (NOT app telemetry; the app sends nothing). -->
 <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "1b598242e0c44f28912150f7a983687c"}'></script>
 </head>
@@ -427,6 +427,10 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
       <li>It's a beta: result quality depends on the model you connect</li>
     </ul>
     <p class="note centered">Set up once — <a href="ai.html">AI setup guide</a>. Or just type <code>/</code> in <code>⌘K</code> inside anf to start.</p>
+    <figure class="keyshot">
+      <img src="../assets/ai-keychain.png" alt="anf's Anthropic API key dialog — stored in the macOS Keychain" loading="lazy">
+      <figcaption>Your API key is kept safely in the <b>macOS Keychain</b> — never in plain text, and never sent to a server (anf doesn't have one).</figcaption>
+    </figure>
   </section>
 
   <!-- Privacy -->
@@ -454,6 +458,11 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
           <div class="ic">⚷</div>
           <h3>It never knows your passwords</h3>
           <p>SSH/SFTP uses key/agent auth only — passwords are never asked for or stored. Diagnostic logging is off by default (opt-in).</p>
+        </div>
+        <div class="tile">
+          <div class="ic">🔑</div>
+          <h3>Your API key lives in the Keychain</h3>
+          <p>Your Anthropic API key is <strong>never stored in plaintext</strong> — not in the settings file, not anywhere on disk. It's kept only in the macOS <strong>Keychain</strong>. Enter it from the AI menu and it's saved there securely.</p>
         </div>
       </div>
       <p class="note centered">Details in the <a href="privacy.html">privacy policy</a> — short enough to actually read.</p>

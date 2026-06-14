@@ -20,7 +20,7 @@
 <meta name="theme-color" content="#060607">
 <link rel="alternate" hreflang="ko" href="https://rescenedev.github.io/anf/">
 <link rel="alternate" hreflang="en" href="https://rescenedev.github.io/anf/en/">
-<link rel="stylesheet" href="styles.css?v=20">
+<link rel="stylesheet" href="styles.css?v=21">
 <!-- Cloudflare Web Analytics — cookieless site analytics (NOT app telemetry; the app sends nothing). -->
 <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "1b598242e0c44f28912150f7a983687c"}'></script>
 </head>
@@ -427,6 +427,10 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
       <li>베타입니다: 결과 품질은 연결한 모델 수준에 따라 다를 수 있어요</li>
     </ul>
     <p class="note centered">설정 한 번이면 끝 — <a href="ai.html">AI 설정 가이드</a>. anf에서 <code>⌘K</code>에 <code>/</code>를 쳐도 바로 시작할 수 있어요.</p>
+    <figure class="keyshot">
+      <img src="assets/ai-keychain.png" alt="anf의 Anthropic API 키 입력 창 — macOS 키체인에 저장됩니다" loading="lazy">
+      <figcaption>API 키는 <b>macOS 키체인</b>에 안전하게 보관됩니다 — 평문으로 저장하지 않고, 보낼 서버도 없습니다 (anf엔 서버 자체가 없으니까요).</figcaption>
+    </figure>
   </section>
 
   <!-- Privacy -->
@@ -454,6 +458,11 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
           <div class="ic">⚷</div>
           <h3>비밀번호를 모릅니다</h3>
           <p>SSH/SFTP는 키·에이전트 인증만 사용합니다 — 비밀번호를 입력받지도, 저장하지도 않습니다. 진단 로그도 기본 꺼짐(옵트인)입니다.</p>
+        </div>
+        <div class="tile">
+          <div class="ic">🔑</div>
+          <h3>API 키는 키체인에</h3>
+          <p>Anthropic API 키는 설정 파일이나 어디에도 <strong>절대 평문으로 저장하지 않습니다</strong> — macOS <strong>키체인(Keychain Access)</strong>에만 보관합니다. AI 메뉴에서 키를 입력하면 키체인에 안전하게 저장됩니다.</p>
         </div>
       </div>
       <p class="note centered">자세한 내용은 <a href="privacy.html">개인정보처리방침</a> — 한 페이지면 충분할 만큼 짧습니다.</p>
