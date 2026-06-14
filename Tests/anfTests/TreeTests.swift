@@ -43,9 +43,8 @@ func runTreeTests() {
         }
 
         T.group("collapse with a selected child lands selection on the folder") {
-            // re-expand and select a child
-            model.toggleExpand(subItem)
-            pump { model.items.contains { $0.name == "s1.txt" } }
+            // sub is still expanded from the previous group; select a child, then
+            // collapse — the orphaned selection should land on the folder.
             if let s1 = model.items.first(where: { $0.name == "s1.txt" }) {
                 model.selection = [s1.id]
             }
