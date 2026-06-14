@@ -91,7 +91,10 @@ enum ExternalTools {
 
         let outPipe = Pipe()
         process.standardOutput = outPipe
-        process.standardError = Pipe()
+        // Redirect stderr to /dev/null rather than a Pipe. An unread Pipe fills at
+        // ~64 KB and then blocks the child on its stderr write, causing waitUntilExit
+        // to hang indefinitely when a tool emits a large error message (ET-001).
+        process.standardError = FileHandle.nullDevice
 
         if let stdin {
             let inPipe = Pipe()
