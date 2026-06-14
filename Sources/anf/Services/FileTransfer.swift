@@ -84,10 +84,23 @@ final class FileTransfer {
         }
         guard !plan.isEmpty else { completion(); return }
 
-        // Overwrite = trash the existing items first, so it's recoverable.
+        // Overwrite = trash the existing items first so the destination slot is
+        // free for copying. We trash directly (not via FileOperations.moveToTrash)
+        // so we control the undo record: victims are bundled with the copy undo
+        // below, not recorded as an independent step. If the copy entirely fails
+        // the victims are immediately restored from Trash (FT-001 data-loss fix).
+        var victimPairs: [(original: URL, trashed: URL)] = []
         if !overwriteVictims.isEmpty {
-            let victims = overwriteVictims.compactMap { FileItem(url: $0) }
-            FileOperations.moveToTrash(victims)
+            for url in overwriteVictims {
+                var t: NSURL?
+                do {
+                    try FileManager.default.trashItem(at: url, resultingItemURL: &t)
+                    if let t = t as URL? { victimPairs.append((url, t)) }
+                } catch {
+                    // Trash failed — keep the victim; the copy will likely also fail
+                    // when it tries to write to the occupied path, surfaced below.
+                }
+            }
         }
 
         // 3) EVERYTHING heavy runs off the main thread; the HUD is time-based —
@@ -199,7 +212,23 @@ final class FileTransfer {
             guard let self else { return }
             self.jobDone = true
             self.isActive = false
-            if !result.done.isEmpty {
+            if result.done.isEmpty, !victimPairs.isEmpty {
+                // Every item failed to copy — victims are in the Trash but nothing
+                // arrived at the destination. Restore them immediately so the user
+                // doesn't lose data on a failed overwrite (FT-001).
+                await Task.detached(priority: .userInitiated) {
+                    for (original, trashed) in victimPairs {
+                        try? FileManager.default.moveItem(at: trashed, to: original)
+                    }
+                }.value
+            } else if !result.done.isEmpty {
+                // At least some items were copied successfully. Record the victim
+                // trash BEFORE the copy undo so ⌘Z applied in order first removes
+                // the copies, then restores the victims — one logical "revert
+                // overwrite" gesture for the user.
+                if !victimPairs.isEmpty {
+                    FileUndo.shared.record(.trash(victimPairs))
+                }
                 FileUndo.shared.record(move
                     ? .move(result.done.map { (from: $0.from, to: $0.to) })
                     : .created(result.undoCreated))
