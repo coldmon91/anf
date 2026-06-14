@@ -153,7 +153,7 @@ final class FileTransfer {
                 let lock = NSLock()
                 var completed = 0
                 var lastPushed = ContinuousClock.now
-                Self.boundedForEach(work.count, maxConcurrent: cap) { i in
+                Self.boundedForEach(work.count, maxConcurrent: cap, useAllCores: destLocal) { i in
                     if flag.isSet { return }
                     let (src, dest) = work[i]
                     var okPair: (URL, URL)?
@@ -259,17 +259,22 @@ final class FileTransfer {
     }
 
     /// Run `body(0..<count)` with at most `maxConcurrent` running at once. Full-core
-    /// → `concurrentPerform`; capped → a semaphore-bounded dispatch (so a network
+    /// → `concurrentPerform` (only when `useAllCores` is true AND the cap matches
+    /// the core count); capped → a semaphore-bounded dispatch (so a network
     /// copy/move doesn't open dozens of byte streams over one SMB connection).
+    /// `useAllCores` must be false for network destinations: on a 4-core machine
+    /// a network cap of 4 would otherwise trip the `cap >= activeProcessorCount`
+    /// condition and bypass the semaphore entirely (FT-002 / N-005 regression).
     /// Blocks the caller until done — call OFF the main thread.
     nonisolated static func boundedForEach(_ count: Int, maxConcurrent: Int,
+                                           useAllCores: Bool = false,
                                            _ body: @escaping (Int) -> Void) {
         let cap = Swift.max(1, maxConcurrent)
         if count <= 1 || cap == 1 {
             for i in 0..<count { body(i) }
             return
         }
-        if cap >= ProcessInfo.processInfo.activeProcessorCount {
+        if useAllCores && cap >= ProcessInfo.processInfo.activeProcessorCount {
             DispatchQueue.concurrentPerform(iterations: count, execute: body)
             return
         }
