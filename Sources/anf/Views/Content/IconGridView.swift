@@ -28,6 +28,9 @@ struct IconGridView: NSViewRepresentable {
         cv.dataSource = coord
         cv.delegate = coord
         cv.register(IconItem.self, forItemWithIdentifier: IconItem.reuseID)
+        cv.register(GridSectionHeader.self,
+                    forSupplementaryViewOfKind: NSCollectionView.elementKindSectionHeader,
+                    withIdentifier: GridSectionHeader.reuseID)
         cv.setDraggingSourceOperationMask([.copy, .move, .generic], forLocal: true)
         cv.setDraggingSourceOperationMask([.copy], forLocal: false)
         cv.registerForDraggedTypes([.fileURL])
@@ -70,6 +73,32 @@ struct IconGridView: NSViewRepresentable {
             NSSize(width: icon + 28, height: icon + 46)
         }
 
+        // MARK: Grouping (section ↔ flat item-index mapping)
+        //
+        // When Arrange-by is active each group is a collection-view section with a
+        // header; `items` stays the flat (grouped-order) list, so these convert
+        // between an IndexPath and the flat index keyboard nav/selection use.
+        private var grouped: Bool { model.grouped }
+
+        private func flatIndex(_ ip: IndexPath) -> Int? {
+            if !grouped { return ip.item < items.count ? ip.item : nil }
+            let groups = model.groupRanges
+            guard ip.section < groups.count else { return nil }
+            let base = groups[ip.section].range.lowerBound + ip.item
+            return base < groups[ip.section].range.upperBound && base < items.count ? base : nil
+        }
+
+        private func itemAt(_ ip: IndexPath) -> FileItem? { flatIndex(ip).map { items[$0] } }
+
+        private func indexPath(forFlat i: Int) -> IndexPath? {
+            guard i >= 0, i < items.count else { return nil }
+            if !grouped { return IndexPath(item: i, section: 0) }
+            for (s, g) in model.groupRanges.enumerated() where g.range.contains(i) {
+                return IndexPath(item: i - g.range.lowerBound, section: s)
+            }
+            return nil
+        }
+
         func sync() {
             guard let cv = collection else { return }
             model.contentScrollView = cv.enclosingScrollView
@@ -105,7 +134,7 @@ struct IconGridView: NSViewRepresentable {
         private func applySelection(_ cv: NSCollectionView, force: Bool = false, scroll: Bool) {
             guard syncState.selectionChanged(model.selection, force: force) else { return }
             let want = Set(model.selection.compactMap { id in
-                model.index(of: id).map { IndexPath(item: $0, section: 0) }
+                model.index(of: id).flatMap { indexPath(forFlat: $0) }
             })
             guard want != cv.selectionIndexPaths else { return }
             syncState.applying {
@@ -116,8 +145,8 @@ struct IconGridView: NSViewRepresentable {
                 // Follow the moving cursor (the growing edge of a shift-select),
                 // not the topmost item — otherwise shift+↓ / shift+PgDn never
                 // scroll because the top stays put. Fall back to the topmost.
-                let target = model.selectionCursorIndex.map { IndexPath(item: $0, section: 0) }
-                    ?? want.min(by: { $0.item < $1.item })
+                let cursor = model.selectionCursorIndex.flatMap { indexPath(forFlat: $0) }
+                let target = cursor ?? want.min(by: { $0.section != $1.section ? $0.section < $1.section : $0.item < $1.item })
                 if let target {
                     cv.scrollToItems(at: [target], scrollPosition: .nearestHorizontalEdge)
                 }
@@ -128,8 +157,8 @@ struct IconGridView: NSViewRepresentable {
             guard model.editingItemID != lastEditingID else { return }
             lastEditingID = model.editingItemID
             guard let id = model.editingItemID,
-                  let row = items.firstIndex(where: { $0.id == id }) else { return }
-            let path = IndexPath(item: row, section: 0)
+                  let row = items.firstIndex(where: { $0.id == id }),
+                  let path = indexPath(forFlat: row) else { return }
             cv.scrollToItems(at: [path], scrollPosition: .nearestHorizontalEdge)
             DispatchQueue.main.async { [weak self, weak cv] in
                 guard let self, let cv,
@@ -149,21 +178,41 @@ struct IconGridView: NSViewRepresentable {
 
         // MARK: Data source
 
-        func numberOfSections(in collectionView: NSCollectionView) -> Int { 1 }
+        func numberOfSections(in collectionView: NSCollectionView) -> Int {
+            grouped ? model.groupRanges.count : 1
+        }
 
         func collectionView(_ collectionView: NSCollectionView,
-                            numberOfItemsInSection section: Int) -> Int { items.count }
+                            numberOfItemsInSection section: Int) -> Int {
+            guard grouped else { return items.count }
+            return section < model.groupRanges.count ? model.groupRanges[section].range.count : 0
+        }
 
         func collectionView(_ collectionView: NSCollectionView,
                             itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
             let cell = collectionView.makeItem(withIdentifier: IconItem.reuseID,
                                                for: indexPath) as! IconItem
-            if indexPath.item < items.count {
-                let item = items[indexPath.item]
+            if let item = itemAt(indexPath) {
                 cell.configure(with: item, iconSide: model.iconSize)
                 cell.onDoubleClick = { [weak self] in self?.model.open(item) }
             }
             return cell
+        }
+
+        func collectionView(_ collectionView: NSCollectionView,
+                            viewForSupplementaryElementOfKind kind: String,
+                            at indexPath: IndexPath) -> NSView {
+            let header = collectionView.makeSupplementaryView(
+                ofKind: kind, withIdentifier: GridSectionHeader.reuseID, for: indexPath) as! GridSectionHeader
+            if grouped, indexPath.section < model.groupRanges.count {
+                header.set(model.groupRanges[indexPath.section].title)
+            }
+            return header
+        }
+
+        func collectionView(_ collectionView: NSCollectionView, layout: NSCollectionViewLayout,
+                            referenceSizeForHeaderInSection section: Int) -> NSSize {
+            grouped ? NSSize(width: 0, height: 28) : .zero
         }
 
         // MARK: Selection
@@ -180,9 +229,7 @@ struct IconGridView: NSViewRepresentable {
 
         private func pushSelection(_ cv: NSCollectionView) {
             guard !syncState.isSyncing else { return }
-            let ids = Set(cv.selectionIndexPaths.compactMap {
-                $0.item < items.count ? items[$0.item].id : nil
-            })
+            let ids = Set(cv.selectionIndexPaths.compactMap { itemAt($0)?.id })
             syncState.recordApplied(ids)
             if ids != model.selection { model.selection = ids }
         }
@@ -190,8 +237,8 @@ struct IconGridView: NSViewRepresentable {
         // MARK: Context menu (shared with the list view)
 
         func menu(at point: NSPoint, in cv: NSCollectionView) -> NSMenu? {
-            if let path = cv.indexPathForItem(at: point), path.item < items.count {
-                return FileItemMenu.build(for: items[path.item], model: model)
+            if let path = cv.indexPathForItem(at: point), let it = itemAt(path) {
+                return FileItemMenu.build(for: it, model: model)
             }
             return FileItemMenu.background(model: model)
         }
@@ -200,7 +247,7 @@ struct IconGridView: NSViewRepresentable {
 
         func collectionView(_ collectionView: NSCollectionView,
                             pasteboardWriterForItemAt indexPath: IndexPath) -> NSPasteboardWriting? {
-            indexPath.item < items.count ? items[indexPath.item].url as NSURL : nil
+            (itemAt(indexPath)?.url).map { $0 as NSURL }
         }
 
         func collectionView(_ collectionView: NSCollectionView,
@@ -210,8 +257,7 @@ struct IconGridView: NSViewRepresentable {
             // Only "drop ON a folder" is meaningful here; pane-level drops are
             // handled by the SwiftUI dropDestination in ContentArea.
             let path = proposedIndexPath.pointee as IndexPath
-            guard dropOperation.pointee == .on, path.item < items.count,
-                  items[path.item].isBrowsableContainer else { return [] }
+            guard dropOperation.pointee == .on, itemAt(path)?.isBrowsableContainer == true else { return [] }
             return .move
         }
 
@@ -219,11 +265,11 @@ struct IconGridView: NSViewRepresentable {
                             acceptDrop draggingInfo: NSDraggingInfo,
                             indexPath: IndexPath,
                             dropOperation: NSCollectionView.DropOperation) -> Bool {
-            guard indexPath.item < items.count,
+            guard let target = itemAt(indexPath),
                   let urls = draggingInfo.draggingPasteboard
                       .readObjects(forClasses: [NSURL.self]) as? [URL],
                   !urls.isEmpty else { return false }
-            model.acceptDrop(urls, into: items[indexPath.item].url, copy: false)
+            model.acceptDrop(urls, into: target.url, copy: false)
             return true
         }
     }
@@ -389,6 +435,30 @@ final class IconItem: NSCollectionViewItem, NSTextFieldDelegate {
         renameCancel = nil
         label.isEditable = false
     }
+}
+
+/// Group header shown above each section when Arrange-by is active: a bottom-
+/// aligned, semibold secondary label matching the list view's group headers.
+final class GridSectionHeader: NSView {
+    static let reuseID = NSUserInterfaceItemIdentifier("anf.grid.header")
+    private let label = NSTextField(labelWithString: "")
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        identifier = Self.reuseID
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.isBordered = false; label.drawsBackground = false
+        label.font = .systemFont(ofSize: 11, weight: .semibold)
+        label.textColor = .secondaryLabelColor
+        label.lineBreakMode = .byTruncatingTail
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -16),
+            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    func set(_ text: String) { label.stringValue = text }
 }
 
 /// Plain container that forwards double-clicks (single-click selection is
