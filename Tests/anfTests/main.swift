@@ -68,6 +68,7 @@ runAIConsentTests()
 runVaultGuardTests()
 MainActor.assumeIsolated { runUndoCoalesceTests() }
 MainActor.assumeIsolated { runNetworkStallTests() }
+runFixVerificationTests()
 
 print("")
 if T.failures.isEmpty {
