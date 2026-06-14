@@ -283,10 +283,45 @@ struct FileListView: NSViewRepresentable {
             }
         }
 
-        // MARK: Drag
+        // MARK: Drag & drop
 
         func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
             row < items.count ? items[row].url as NSURL : nil
+        }
+
+        // Without these two, registering for dragged types makes the table SWALLOW
+        // drops (it's a registered destination that rejects everything), so the
+        // SwiftUI `.dropDestination` behind it never fires — pane-to-pane file move
+        // in list mode silently fails. Drop onto a folder row → into that folder;
+        // anywhere else → into the current folder.
+        func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo,
+                       proposedRow row: Int,
+                       proposedDropOperation op: NSTableView.DropOperation) -> NSDragOperation {
+            guard info.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: nil) else { return [] }
+            if !(op == .on && row >= 0 && row < items.count && items[row].isBrowsableContainer) {
+                tableView.setDropRow(-1, dropOperation: .above)   // whole-table drop
+            }
+            return copyRequested(info) ? .copy : .move
+        }
+
+        func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo,
+                       row: Int, dropOperation op: NSTableView.DropOperation) -> Bool {
+            guard let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self],
+                                                                 options: nil) as? [URL],
+                  !urls.isEmpty else { return false }
+            let into: URL = (op == .on && row >= 0 && row < items.count && items[row].isBrowsableContainer)
+                ? items[row].url : model.currentURL
+            // Never drop a folder into itself or its own subtree.
+            guard !urls.contains(where: { into.path == $0.path || into.path.hasPrefix($0.path + "/") })
+            else { return false }
+            model.acceptDrop(urls, into: into, copy: copyRequested(info))
+            return true
+        }
+
+        /// Option held narrows the source mask to copy-only (and external drags
+        /// arrive copy-only); otherwise it's a move.
+        private func copyRequested(_ info: NSDraggingInfo) -> Bool {
+            info.draggingSourceOperationMask == .copy
         }
 
         // MARK: Inline rename commit

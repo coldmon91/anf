@@ -1125,11 +1125,16 @@ final class BrowserModel: Identifiable {
                                        message: L("Enter or paste a path:", "경로를 입력하거나 붙여넣기:"),
                                        defaultValue: currentURL.path, action: L("Go", "이동")) else { return }
         let expanded = (raw as NSString).expandingTildeInPath
-        var isDir: ObjCBool = false
-        if FileManager.default.fileExists(atPath: expanded, isDirectory: &isDir), isDir.boolValue {
-            navigate(to: URL(fileURLWithPath: expanded))
-        } else {
-            NSSound.beep()
+        // Validate OFF the main thread: a pasted path on a slow/disconnected
+        // network mount makes `fileExists` block for the mount's full timeout,
+        // freezing the UI right after the user hits Go.
+        Task { @MainActor in
+            let isDir = await Task.detached(priority: .userInitiated) { () -> Bool in
+                var dir: ObjCBool = false
+                return FileManager.default.fileExists(atPath: expanded, isDirectory: &dir) && dir.boolValue
+            }.value
+            if isDir { navigate(to: URL(fileURLWithPath: expanded)) }
+            else { NSSound.beep() }
         }
     }
 }
