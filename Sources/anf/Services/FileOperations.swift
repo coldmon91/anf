@@ -136,12 +136,17 @@ enum FileOperations {
             let dir = item.url.deletingLastPathComponent()
             let base = item.url.deletingPathExtension().lastPathComponent
             let ext = item.url.pathExtension
-            var dest = dir.appendingPathComponent("\(base) copy")
-                .appendingPathExtension(ext.isEmpty ? "" : ext)
+            // appendingPathExtension("") is undefined — on some runtime versions it
+            // appends a trailing dot producing "Makefile copy." (FO-002). Build the
+            // name via string interpolation (same as uniqueURL) when there's no ext.
+            var dest = ext.isEmpty
+                ? dir.appendingPathComponent("\(base) copy")
+                : dir.appendingPathComponent("\(base) copy").appendingPathExtension(ext)
             var n = 2
             while fm.fileExists(atPath: dest.path) {
-                dest = dir.appendingPathComponent("\(base) copy \(n)")
-                    .appendingPathExtension(ext.isEmpty ? "" : ext)
+                dest = ext.isEmpty
+                    ? dir.appendingPathComponent("\(base) copy \(n)")
+                    : dir.appendingPathComponent("\(base) copy \(n)").appendingPathExtension(ext)
                 n += 1
             }
             do {
