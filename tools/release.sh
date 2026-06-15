@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-command release: bump version → build → notarize → zip → GitHub release → cask update.
+# One-command release: bump version → build → notarize → DMG → GitHub release → cask update.
 #   ./tools/release.sh 1.1.0
 # Requires: gh (authenticated), push access to rescenedev/anf and
 # rescenedev/homebrew-anf, a "Developer ID Application" cert in the keychain,
@@ -52,10 +52,22 @@ xcrun stapler staple anf.app
 xcrun stapler validate anf.app
 spctl -a -vvv anf.app   # 'accepted, source=Notarized Developer ID' 이어야 정상
 
-echo "▸ zip (스테이플된 앱)"
-rm -f anf.zip
-ditto -c -k --keepParent anf.app anf.zip
-SHA=$(shasum -a 256 anf.zip | awk '{print $1}')
+echo "▸ DMG 생성 (드래그-투-Applications 레이아웃)"
+DMG=anf.dmg
+rm -f "$DMG"
+STAGE=$(mktemp -d)
+cp -R anf.app "$STAGE/anf.app"
+ln -s /Applications "$STAGE/Applications"
+hdiutil create -volname "anf" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+rm -rf "$STAGE"
+codesign --force --timestamp --sign "Developer ID Application" "$DMG"
+
+echo "▸ DMG 공증 + 스테이플"
+xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+xcrun stapler staple "$DMG"
+xcrun stapler validate "$DMG"
+spctl -a -t open --context context:primary-signature -vv "$DMG"   # 'accepted, Notarized Developer ID'
+SHA=$(shasum -a 256 "$DMG" | awk '{print $1}')
 echo "  sha256: $SHA"
 
 echo "▸ 버전 커밋 + 태그"
@@ -65,7 +77,7 @@ git tag "$TAG"
 git push origin main "$TAG"
 
 echo "▸ GitHub Release $TAG"
-gh release create "$TAG" anf.zip --repo rescenedev/anf \
+gh release create "$TAG" anf.dmg --repo rescenedev/anf \
     --title "anf $TAG" --generate-notes
 
 echo "▸ Homebrew cask 갱신"
@@ -73,8 +85,9 @@ TAP_DIR=$(mktemp -d)
 git clone -q --depth 1 https://github.com/rescenedev/homebrew-anf "$TAP_DIR"
 sed -i '' "s/version \"[^\"]*\"/version \"$VERSION\"/" "$TAP_DIR/Casks/anf.rb"
 sed -i '' "s/sha256 \"[^\"]*\"/sha256 \"$SHA\"/" "$TAP_DIR/Casks/anf.rb"
+sed -i '' "s#/anf\.zip#/anf.dmg#g" "$TAP_DIR/Casks/anf.rb"   # migrate the asset url to .dmg
 git -C "$TAP_DIR" commit -aqm "anf $VERSION"
 git -C "$TAP_DIR" push -q
-rm -rf "$TAP_DIR" anf.zip
+rm -rf "$TAP_DIR" anf.dmg
 
 echo "✓ $TAG 릴리즈 완료 — brew upgrade --cask anf 로 받아집니다"
