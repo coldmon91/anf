@@ -78,8 +78,7 @@
 brew trust rescenedev/anf
 brew install --cask anf</code><button class="copy-btn" type="button" data-target="cmd-brew" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
         <p class="note">Update with <code>brew upgrade --cask anf</code>.</p>
-        <p class="note">Not notarized yet — if Gatekeeper blocks the first launch, <strong>right-click → Open</strong>, or strip the quarantine flag:</p>
-        <div class="cmd"><code>xattr -dr com.apple.quarantine /Applications/anf.app</code><button class="copy-btn" type="button" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+        <p class="note"><strong>Apple-notarized</strong> — signed with a Developer ID and notarized, so it launches straight away with no Gatekeeper warning.</p>
         <p class="note">Optional — install <code>fd</code> and <code>ripgrep</code> for faster name/content search (falls back to Spotlight without them):</p>
         <div class="cmd"><code>brew install fd ripgrep</code><button class="copy-btn" type="button" aria-label="Copy"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
         <p class="note">Optional — full rich HWP/HWPX previews (alhangeul). anf extracts the body text on its own even without it:</p>
@@ -472,6 +471,8 @@ brew install --cask anf</code><button class="copy-btn" type="button" data-target
       <h2 class="centered">Release notes.</h2>
       <p class="note centered">Already installed? Update with a single <code>brew upgrade --cask anf</code>.</p>
       <p class="sub centered">v1.5 — <b>on-device AI</b> (summarize, ask, suggest name, auto-tag, organize, image search) and an <b>inline list tree</b> land.</p>
+      <p class="note centered">v1.5.10 — <b>Apple-notarized</b>: signed with a Developer ID and notarized, so the first launch has no Gatekeeper warning.</p>
+      <p class="note centered">v1.5.5–1.5.9 — Windows-Commander-style <b><code>..</code> parent row</b>, <b>pin a tab to a folder (★)</b>, <b>inline path editing</b> (⌘L), the <b>Delete key (⌦) trashes</b>, tab-switch list refresh, <b>Enter on the delete-confirm dialog</b>, <b>persistent column widths</b>, dual-split ratio (%) readout, and network &amp; Vault hardening.</p>
       <p class="note centered">v1.5.4 — <b>Recents &amp; Smart Folders</b> (virtual sidebar locations), <b>Arrange-By group headers</b> (list &amp; icon views), and your <b>Anthropic API key now lives in the macOS Keychain</b> (set it from the AI menu; any plaintext key is migrated automatically). Steadier network-drive reconnects, list drag-and-drop moves, and Go-to-Folder.</p>
       <p class="note centered">v1.5.0 — AI features (opt-in): summarize, Q&amp;A, smart rename, auto-tag, organize by kind/content, image search. Pick the backend — <b>Claude, a local model (Ollama/LM Studio), or Apple on-device</b>. Press <code>/</code> in ⌘K to ask. <b>Inline folder tree</b> in list mode, ⌘? shortcuts, F4 open-with, Esc-closable panels, JSON migration for pins &amp; workspaces.</p>
       <p class="note centered">v1.0.3 — sidebar favorites now navigate only the focused pane while split (previously both panes changed).</p>
