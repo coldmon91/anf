@@ -1,16 +1,34 @@
 #!/bin/bash
-# One-command release: bump version → build → zip → GitHub release → cask update.
+# One-command release: bump version → build → notarize → zip → GitHub release → cask update.
 #   ./tools/release.sh 1.1.0
 # Requires: gh (authenticated), push access to rescenedev/anf and
-# rescenedev/homebrew-anf.
+# rescenedev/homebrew-anf, a "Developer ID Application" cert in the keychain,
+# and a notarytool credential profile named "anf-notary" (set up once with:
+#   xcrun notarytool store-credentials anf-notary \
+#       --key AuthKey_XXXX.p8 --key-id XXXX --issuer XXXX-...).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+NOTARY_PROFILE="anf-notary"
 
 VERSION="${1:?사용법: ./tools/release.sh <version>  (예: 1.1.0)}"
 TAG="v$VERSION"
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
     echo "✗ 커밋되지 않은 변경이 있습니다. 먼저 커밋하세요." >&2
+    exit 1
+fi
+
+# Preflight: fail early (before bumping version / building) if signing or
+# notarization isn't set up, so a release never ships unsigned by accident.
+if ! security find-identity -p codesigning -v 2>/dev/null | grep -q "Developer ID Application"; then
+    echo "✗ 'Developer ID Application' 인증서가 키체인에 없습니다." >&2
+    echo "  Xcode → Settings → Accounts → Manage Certificates → + → Developer ID Application" >&2
+    exit 1
+fi
+if ! xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
+    echo "✗ notarytool 자격증명 프로파일 '$NOTARY_PROFILE' 가 없습니다." >&2
+    echo "  xcrun notarytool store-credentials $NOTARY_PROFILE --key AuthKey_XXXX.p8 --key-id XXXX --issuer XXXX-..." >&2
     exit 1
 fi
 
@@ -24,7 +42,17 @@ swift run anfTests
 echo "▸ 빌드"
 ./build.sh
 
-echo "▸ zip"
+echo "▸ 공증 (notarytool submit --wait)"
+rm -f anf-notarize.zip
+ditto -c -k --keepParent anf.app anf-notarize.zip
+xcrun notarytool submit anf-notarize.zip --keychain-profile "$NOTARY_PROFILE" --wait
+rm -f anf-notarize.zip
+echo "▸ 티켓 스테이플"
+xcrun stapler staple anf.app
+xcrun stapler validate anf.app
+spctl -a -vvv anf.app   # 'accepted, source=Notarized Developer ID' 이어야 정상
+
+echo "▸ zip (스테이플된 앱)"
 rm -f anf.zip
 ditto -c -k --keepParent anf.app anf.zip
 SHA=$(shasum -a 256 anf.zip | awk '{print $1}')

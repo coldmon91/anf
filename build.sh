@@ -30,13 +30,23 @@ cp -R "$(swift build -c "$CONFIG" --show-bin-path)/anf_anf.bundle" "$RES_DIR/"
     exit 1
 }
 
-# Sign with the stable self-signed identity if present (keeps TCC file-access
-# permissions across rebuilds); fall back to ad-hoc otherwise.
-# Set up once with: ./tools/setup-signing.sh
-SIGN_ID="anf-dev"
-if security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_ID" \
-   && codesign --force --deep --sign "$SIGN_ID" "$APP" >/dev/null 2>&1; then
-    echo "▸ Signed with '$SIGN_ID' (stable identity)"
+# Signing preference, best → worst:
+#   1. Developer ID Application — hardened runtime + secure timestamp, the form
+#      Apple notarization requires. Sign nested code BEFORE the outer bundle
+#      (Apple discourages --deep for distribution). Release builds land here.
+#   2. anf-dev — stable self-signed identity; keeps macOS TCC (file-access)
+#      permissions across local rebuilds. Set up via ./tools/setup-signing.sh.
+#   3. ad-hoc — last resort.
+DEVID="Developer ID Application"
+if security find-identity -p codesigning -v 2>/dev/null | grep -q "$DEVID"; then
+    # anf_anf.bundle is a pure resource dir (no Info.plist, no Mach-O) — it carries
+    # no code, so it isn't signed on its own; signing the app seals it as a resource.
+    codesign --force --options runtime --timestamp \
+        --sign "$DEVID" "$APP" >/dev/null
+    echo "▸ Signed with '$DEVID' (hardened runtime — ready for notarization)"
+elif security find-identity -p codesigning 2>/dev/null | grep -q "anf-dev" \
+     && codesign --force --deep --sign "anf-dev" "$APP" >/dev/null 2>&1; then
+    echo "▸ Signed with 'anf-dev' (stable self-signed identity)"
 else
     codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
     echo "▸ Ad-hoc signed (run ./tools/setup-signing.sh for persistent permissions)"
